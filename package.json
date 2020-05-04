@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node ./bin/www",
-    "lint": "eslint ./",
-    "lint:fix": "eslint --fix ./"
+    "lint": "eslint \"./**/*.js\"",
+    "lint:fix": "eslint --fix \"./**/*.js\""
   },
   "dependencies": {
     "cors": "^2.8.5",
