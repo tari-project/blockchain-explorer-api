@@ -14,8 +14,8 @@ app.use(express.urlencoded({ extended: false }))
 app.use(express.static(path.join(__dirname, 'public')))
 
 /** Routes */
-const indexRouter = require('./routes/index')
+const baseNodeRouter = require('./routes/base_node')
 
-app.use('/', indexRouter)
+app.use('/', baseNodeRouter)
 
 module.exports = app
