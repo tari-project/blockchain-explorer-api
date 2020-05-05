@@ -16,7 +16,6 @@ const { tari: { base_node: tariBaseNode } } = proto
 const client = new tariBaseNode.BaseNode(`${GRPC_HOST}:${GRPC_PORT}`, grpc.credentials.createInsecure())
 
 const protos = {
-  blocks: require('./base_node/blocks')(client),
-  headers: require('./base_node/headers')(client)
+  baseNode: require('./base_node/index')(client)
 }
 module.exports = protos
