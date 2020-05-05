@@ -1,4 +1,4 @@
-version: "3.4"
+version: "3.5"
 services:
   api:
     build:
@@ -7,8 +7,16 @@ services:
     ports:
       - "4000:4000"
     restart: unless-stopped
+    depends_on:
+      - tari
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000"]
       interval: 10s
       timeout: 5s
       retries: 3
+  tari:
+    image: quay.io/krakaw/tari-docker:latest
+    volumes:
+      - "$PWD/data/tari:/root/.tari"
+    stdin_open: true
+    tty: true
