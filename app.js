@@ -4,6 +4,10 @@ const express = require('express')
 const logger = require('morgan')
 const cors = require('cors')
 
+const sync = require('./helpers/sync')
+sync.syncBlocks().then(r => {
+  console.log(r)
+})
 const app = express()
 
 app.use(cors())

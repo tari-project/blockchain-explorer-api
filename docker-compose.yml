@@ -9,6 +9,7 @@ services:
     restart: unless-stopped
     depends_on:
       - tari
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000"]
       interval: 10s
@@ -17,6 +18,17 @@ services:
   tari:
     image: quay.io/krakaw/tari-docker:latest
     volumes:
-      - "$PWD/data/tari:/root/.tari"
+      - "$PWD/_data/tari:/root/.tari"
+    ports:
+      - "18142:18142"
     stdin_open: true
     tty: true
+    command: bash
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    volumes:
+      - "$PWD/_data/redis:/var/lib/redis"
+    environment:
+      - REDIS_REPLICATION_MODE=master
