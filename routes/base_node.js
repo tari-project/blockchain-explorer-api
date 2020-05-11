@@ -1,12 +1,16 @@
 const express = require('express')
 const router = express.Router()
-const protos = require('../protos')
+const redis = require('../helpers/redis')
+const { redisPageRange } = require('../helpers/paging')
+const { blockHeight, headerHeight } = require('../helpers/sync')
 
 router.get('/blocks', async (req, res, next) => {
-  const heights = ([].concat(req.query.heights || 1)).map(i => +i)
   try {
-    const blocks = await protos.baseNode.GetBlocks(heights)
-    return res.json({ blocks })
+    const chainTip = await blockHeight()
+    const { getRange, paging } = redisPageRange(req.query, chainTip, 'block_')
+    const blocks = await redis.mget(...getRange)
+
+    return res.json({ blocks, paging })
   } catch (e) {
     return res.sendStatus(500).json(e)
   }
@@ -14,8 +18,11 @@ router.get('/blocks', async (req, res, next) => {
 
 router.get('/headers', async (req, res, next) => {
   try {
-    const headers = await protos.baseNode.ListHeaders(req.query)
-    return res.json({ headers })
+    const chainTip = await headerHeight()
+    const { getRange, paging } = redisPageRange(req.query, chainTip, 'header_')
+    const headers = await redis.mget(...getRange)
+
+    return res.json({ blocks: headers, paging })
   } catch (e) {
     return res.sendStatus(500).json(e)
   }

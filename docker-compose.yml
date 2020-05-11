@@ -23,12 +23,12 @@ services:
       - "18142:18142"
     stdin_open: true
     tty: true
-    command: bash
   redis:
     image: "redis:alpine"
     ports:
       - "6379:6379"
     volumes:
-      - "$PWD/_data/redis:/var/lib/redis"
+      - "$PWD/_data/redis:/data"
+    command: "redis-server --appendonly yes"
     environment:
       - REDIS_REPLICATION_MODE=master

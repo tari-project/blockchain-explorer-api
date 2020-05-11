@@ -3,11 +3,9 @@ const path = require('path')
 const express = require('express')
 const logger = require('morgan')
 const cors = require('cors')
+const cron = require('./helpers/cron')
+cron.schedule()
 
-const sync = require('./helpers/sync')
-sync.syncBlocks().then(r => {
-  console.log(r)
-})
 const app = express()
 
 app.use(cors())
