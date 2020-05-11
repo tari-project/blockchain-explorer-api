@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node ./bin/www",
-    "dev": "nodemon ./bin/www",
+    "dev": "DEBUG=* nodemon --ignore './_data' ./bin/www",
     "lint": "eslint \"./**/*.js\"",
     "lint:fix": "eslint --fix \"./**/*.js\""
   },
@@ -15,7 +15,9 @@
     "dotenv": "^8.2.0",
     "express": "~4.16.1",
     "grpc": "^1.24.2",
-    "morgan": "~1.9.1"
+    "morgan": "~1.9.1",
+    "node-cron": "^2.0.3",
+    "redis": "^3.0.2"
   },
   "devDependencies": {
     "eslint": "^6.8.0",

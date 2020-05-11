@@ -3,6 +3,8 @@ const path = require('path')
 const express = require('express')
 const logger = require('morgan')
 const cors = require('cors')
+const cron = require('./helpers/cron')
+cron.schedule()
 
 const app = express()
 
