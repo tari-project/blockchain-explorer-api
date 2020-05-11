@@ -8,7 +8,7 @@ router.get('/blocks', async (req, res, next) => {
   try {
     const chainTip = await blockHeight()
     const { getRange, paging } = redisPageRange(req.query, chainTip, 'block_')
-    const blocks = await redis.mget(...getRange)
+    const blocks = (await redis.mget(...getRange)).map(JSON.parse)
 
     return res.json({ blocks, paging })
   } catch (e) {
@@ -20,7 +20,7 @@ router.get('/headers', async (req, res, next) => {
   try {
     const chainTip = await headerHeight()
     const { getRange, paging } = redisPageRange(req.query, chainTip, 'header_')
-    const headers = await redis.mget(...getRange)
+    const headers = (await redis.mget(...getRange)).map(JSON.parse)
 
     return res.json({ blocks: headers, paging })
   } catch (e) {
