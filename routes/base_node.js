@@ -16,6 +16,16 @@ router.get('/blocks', async (req, res, next) => {
   }
 })
 
+router.get('/chain-metadata', async (_, res) => {
+  try {
+    const chainTip = await blockHeight()
+
+    return res.json({ blockHeight: chainTip })
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
 router.get('/headers', async (req, res, next) => {
   try {
     const chainTip = await headerHeight()
