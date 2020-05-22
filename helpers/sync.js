@@ -13,6 +13,33 @@ const headerHeight = async () => {
   return +(await redis.get(CURRENT_HEADER_HEIGHT_KEY) || 0)
 }
 
+const getTransactions = async (from) => {
+  const members = await redis.zrangebyscore('transactions', from, '+inf')
+  const formattedMembers = members.map(m => {
+    const [height, timestamp, transactions] = m.split(':')
+    return {
+      height: +height,
+      timestamp: +timestamp,
+      transactions: +transactions
+    }
+  })
+  return formattedMembers
+}
+
+const setTransactions = async (blockData) => {
+  const {
+    block: {
+      header: { height, timestamp: { seconds } },
+      body: { kernels }
+    }
+  } = blockData
+  console.debug('Settings transactions', height)
+  const transactions = kernels.length
+  const timestamp = +seconds * 1000
+  const member = [height, timestamp, transactions].join(':')
+  await redis.zadd('transactions', timestamp, member)
+}
+
 const syncBlocks = async () => {
   let currentCacheBlockHeight = await blockHeight()
   // Get the tip
@@ -32,6 +59,7 @@ const syncBlocks = async () => {
       const blockHeight = +height
       console.debug('Setting block height cache', blockHeight)
       await redis.set(`block_${blockHeight}`, JSON.stringify(blockData))
+      await setTransactions(blockData)
       if (blockHeight > currentBlockHeight) {
         currentBlockHeight = blockHeight
       }
@@ -77,6 +105,7 @@ const syncHeaders = async () => {
 module.exports = {
   blockHeight,
   headerHeight,
+  getTransactions,
   syncBlocks,
   syncHeaders
 }

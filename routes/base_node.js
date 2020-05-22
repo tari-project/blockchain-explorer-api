@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const redis = require('../helpers/redis')
 const { redisPageRange } = require('../helpers/paging')
-const { blockHeight, headerHeight } = require('../helpers/sync')
+const { blockHeight, headerHeight, getTransactions } = require('../helpers/sync')
 
 router.get('/blocks', async (req, res, next) => {
   try {
@@ -37,4 +37,23 @@ router.get('/headers', async (req, res, next) => {
     return res.sendStatus(500).json(e)
   }
 })
+
+router.get('/transactions', async (req, res) => {
+  if (!req.query.from) {
+    return res.sendStatus(400)
+  }
+
+  const from = +req.query.from
+  if (isNaN(from)) {
+    return res.sendStatus(400)
+  }
+
+  try {
+    const transactions = await getTransactions(from)
+    return res.json({ transactions })
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
 module.exports = router
