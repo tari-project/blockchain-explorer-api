@@ -19,6 +19,7 @@ module.exports = (client) => {
           fs.writeFileSync(localPath, remoteProto)
         }
       }
+      return { remoteMd5, localMd5 }
     },
     GetChainTip: async function () {
       const chainTip = await this.ListHeaders({ num_headers: 1 })

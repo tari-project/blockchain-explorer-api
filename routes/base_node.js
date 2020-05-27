@@ -59,8 +59,8 @@ router.get('/transactions', async (req, res) => {
 })
 
 router.post('/proto', simpleAuth, async (req, res) => {
-  baseNode._checkVersion(req.query.update)
-  return res.sendStatus(200)
+  const result = await baseNode._checkVersion(req.query.update)
+  return res.json(result)
 })
 
 module.exports = router
