@@ -3,6 +3,8 @@ const router = express.Router()
 const redis = require('../helpers/redis')
 const { redisPageRange } = require('../helpers/paging')
 const { blockHeight, headerHeight, getTransactions } = require('../helpers/sync')
+const { baseNode } = require('../protos')
+const { simpleAuth } = require('../middleware/auth')
 
 router.get('/blocks', async (req, res, next) => {
   try {
@@ -54,6 +56,11 @@ router.get('/transactions', async (req, res) => {
   } catch (e) {
     return res.sendStatus(500).json(e)
   }
+})
+
+router.post('/proto', simpleAuth, async (req, res) => {
+  baseNode._checkVersion(req.query.update)
+  return res.sendStatus(200)
 })
 
 module.exports = router
