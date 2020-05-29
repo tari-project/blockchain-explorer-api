@@ -3,6 +3,17 @@ const fetch = require('node-fetch')
 const md5 = require('md5')
 const fs = require('fs')
 const path = require('path')
+
+const defaultHeightOrBlockGroupRequest = {
+  from_tip: 30,
+  start_height: 0,
+  end_height: 0
+}
+
+const defaultIntegerValue = {
+  value: 0
+}
+
 module.exports = (client) => {
   return {
     _checkVersion: async (saveNewVersion) => {
@@ -37,6 +48,89 @@ module.exports = (client) => {
         ...listHeadersRequest
       }
       return responsify(client.ListHeaders(options), true, true)
+    },
+    GetCalcTiming: async (heightRequest) => {
+      const options = {
+        ...defaultHeightOrBlockGroupRequest,
+        ...heightRequest
+      }
+      return new Promise((resolve, reject) => {
+        client.GetCalcTiming(options, (error, response) => {
+          if (error) {
+            reject(error)
+          }
+          resolve(response)
+        })
+      })
+    },
+    GetConstants: () => {
+      return new Promise((resolve, reject) => {
+        client.GetConstants(undefined, (error, response) => {
+          if (error) {
+            reject(error)
+          }
+          resolve(response)
+        })
+      })
+    },
+    GetBlockSize: async (blockGroupRequest) => {
+      const options = {
+        ...defaultHeightOrBlockGroupRequest,
+        ...blockGroupRequest
+      }
+      return new Promise((resolve, reject) => {
+        client.GetBlockSize(options, (error, response) => {
+          if (error) {
+            reject(error)
+          }
+          resolve(response)
+        })
+      })
+    },
+    GetBlockFees: async (blockGroupRequest) => {
+      const options = {
+        ...defaultHeightOrBlockGroupRequest,
+        ...blockGroupRequest
+      }
+      return new Promise((resolve, reject) => {
+        client.GetBlockFees(options, (error, response) => {
+          if (error) {
+            reject(error)
+          }
+          resolve(response)
+        })
+      })
+    },
+    GetVersion: async () => {
+      return new Promise((resolve, reject) => {
+        client.GetVersion(undefined, (error, response) => {
+          if (error) {
+            reject(error)
+          }
+          resolve(response)
+        })
+      })
+    },
+    GetTokensInCirculation: async (integerValue) => {
+      const options = {
+        ...defaultIntegerValue,
+        ...integerValue
+      }
+      return new Promise((resolve, reject) => {
+        client.GetTokensInCirculation(options, (error, response) => {
+          if (error) {
+            reject(error)
+          }
+          resolve(response)
+        })
+      })
+    },
+    GetNetworkDifficulty: async (heightRequest) => {
+      const options = {
+        ...defaultHeightOrBlockGroupRequest,
+        ...heightRequest
+      }
+      return responsify(client.GetNetworkDifficulty(options), true, true)
     }
   }
 }

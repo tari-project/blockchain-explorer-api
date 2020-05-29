@@ -63,4 +63,67 @@ router.post('/proto', simpleAuth, async (req, res) => {
   return res.json(result)
 })
 
+router.get('/calc-timing', async (req, res) => {
+  try {
+    const data = await baseNode.GetCalcTiming(req.query)
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
+router.get('/constants', async (_, res) => {
+  try {
+    const data = await baseNode.GetConstants()
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
+router.get('/block-size', async (req, res) => {
+  try {
+    const data = await baseNode.GetBlockSize(req.query)
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
+router.get('/block-fees', async (req, res) => {
+  try {
+    const data = await baseNode.GetBlockFees(req.query)
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
+router.get('/version', async (_, res) => {
+  try {
+    const data = await baseNode.GetVersion()
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
+router.get('/tokens-in-circulation', async (req, res) => {
+  try {
+    const data = await baseNode.GetTokensInCirculation(req.query)
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
+router.get('/network-difficulty', async (req, res) => {
+  try {
+    const data = await baseNode.GetNetworkDifficulty(req.query)
+    return res.json(data)
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
 module.exports = router
