@@ -2,7 +2,14 @@ const express = require('express')
 const router = express.Router()
 const redis = require('../helpers/redis')
 const { redisPageRange } = require('../helpers/paging')
-const { blockHeight, headerHeight, getTransactions, getTotalTransactions } = require('../helpers/sync')
+const {
+  blockHeight,
+  headerHeight,
+  getTransactions,
+  getTotalTransactions,
+  syncBlocks,
+  syncHeaders
+} = require('../helpers/sync')
 const { baseNode } = require('../protos')
 const { simpleAuth } = require('../middleware/auth')
 
@@ -64,6 +71,15 @@ router.get('/transactions', async (req, res) => {
 router.post('/proto', simpleAuth, async (req, res) => {
   const result = await baseNode._checkVersion(req.query.update)
   return res.json(result)
+})
+
+router.post('/sync', simpleAuth, async (req, res) => {
+  syncBlocks()
+  syncHeaders()
+  return res.status(202).json({
+    status: 'OK',
+    message: 'Sync initiated.'
+  })
 })
 
 router.get('/calc-timing', async (req, res) => {
