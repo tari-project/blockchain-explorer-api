@@ -26,6 +26,10 @@ const getTransactions = async (from) => {
   return formattedMembers
 }
 
+const getTotalTransactions = async () => {
+  return +(await redis.get('total_transactions'))
+}
+
 const setTransactions = async (blockData) => {
   const {
     block: {
@@ -38,6 +42,7 @@ const setTransactions = async (blockData) => {
   const timestamp = +seconds * 1000
   const member = [height, timestamp, transactions].join(':')
   await redis.zadd('transactions', timestamp, member)
+  await redis.incrby('total_transactions', transactions)
 }
 
 const syncBlocks = async () => {
@@ -106,6 +111,7 @@ module.exports = {
   blockHeight,
   headerHeight,
   getTransactions,
+  getTotalTransactions,
   syncBlocks,
   syncHeaders
 }
