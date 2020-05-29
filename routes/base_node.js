@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const redis = require('../helpers/redis')
 const { redisPageRange } = require('../helpers/paging')
-const { blockHeight, headerHeight, getTransactions } = require('../helpers/sync')
+const { blockHeight, headerHeight, getTransactions, getTotalTransactions } = require('../helpers/sync')
 const { baseNode } = require('../protos')
 const { simpleAuth } = require('../middleware/auth')
 
@@ -20,9 +20,12 @@ router.get('/blocks', async (req, res, next) => {
 
 router.get('/chain-metadata', async (_, res) => {
   try {
-    const chainTip = await blockHeight()
+    const [chainTip, totalTransactions] = await Promise.all([blockHeight(), getTotalTransactions()])
 
-    return res.json({ blockHeight: chainTip })
+    return res.json({
+      blockHeight: chainTip,
+      totalTransactions
+    })
   } catch (e) {
     return res.sendStatus(500).json(e)
   }
