@@ -4,7 +4,10 @@ const express = require('express')
 const logger = require('morgan')
 const cors = require('cors')
 const cron = require('./helpers/cron')
-cron.schedule()
+
+if (!process.env.NO_CRON) {
+  cron.schedule()
+}
 
 const app = express()
 
