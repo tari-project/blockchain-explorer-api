@@ -8,6 +8,7 @@ const schedule = () => {
   cron.schedule('*/2 * * * *', () => {
     sync.syncBlocks()
     sync.syncHeaders()
+    sync.syncDifficulties()
   }, options)
   return cron
 }

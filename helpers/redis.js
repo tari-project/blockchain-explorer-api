@@ -10,6 +10,7 @@ const client = {
   set: promisify(syncClient.set).bind(syncClient),
   zadd: promisify(syncClient.zadd).bind(syncClient),
   zrangebyscore: promisify(syncClient.zrangebyscore).bind(syncClient),
+  zrange: promisify(syncClient.zrange).bind(syncClient),
   flushall: promisify(syncClient.flushall).bind(syncClient)
 }
 module.exports = client

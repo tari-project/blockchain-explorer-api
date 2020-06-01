@@ -7,12 +7,18 @@ const {
   headerHeight,
   getTransactions,
   getTotalTransactions,
+  getChainRunningTime,
   syncBlocks,
-  syncHeaders
+  syncHeaders,
+  syncDifficulties
 } = require('../helpers/sync')
 const { baseNode } = require('../protos')
 const { simpleAuth } = require('../middleware/auth')
 
+router.get('/sd', async (req, res) => {
+  await syncDifficulties()
+  return res.sendStatus(200)
+})
 router.get('/blocks', async (req, res, next) => {
   try {
     const chainTip = await blockHeight()
@@ -27,11 +33,27 @@ router.get('/blocks', async (req, res, next) => {
 
 router.get('/chain-metadata', async (_, res) => {
   try {
-    const [chainTip, totalTransactions] = await Promise.all([blockHeight(), getTotalTransactions()])
+    const [chainTip, totalTransactions, chainRunningTime] = await Promise.all([blockHeight(), getTotalTransactions(), getChainRunningTime()])
 
+    const difficulties = await baseNode.GetNetworkDifficulty({})
+    console.log(difficulties.length)
+    const averageDifficulty = {
+      difficulty: 0,
+      estimatedHashRate: 0
+    }
+    difficulties.forEach(d => {
+      averageDifficulty.difficulty += +d.difficulty
+      averageDifficulty.estimatedHashRate += +d.estimated_hash_rate
+    })
+    console.log('a', averageDifficulty)
+    averageDifficulty.difficulty = averageDifficulty.difficulty / difficulties.length
+    averageDifficulty.estimatedHashRate = averageDifficulty.estimatedHashRate / difficulties.length
+    console.log('b', averageDifficulty)
     return res.json({
       blockHeight: chainTip,
-      totalTransactions
+      totalTransactions,
+      chainRunningTime,
+      averageDifficulty
     })
   } catch (e) {
     return res.sendStatus(500).json(e)
