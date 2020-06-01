@@ -7,7 +7,6 @@ const schedule = () => {
   // Check every 2 minutes for new blocks and headers
   cron.schedule('*/2 * * * *', () => {
     sync.syncBlocks()
-    sync.syncHeaders()
     sync.syncDifficulties()
   }, options)
   return cron

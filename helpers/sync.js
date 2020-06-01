@@ -1,39 +1,65 @@
 const redis = require('./redis')
 const { range } = require('./array')
-const CURRENT_BLOCK_HEIGHT_KEY = 'current_block_height'
-const CURRENT_HEADER_HEIGHT_KEY = 'current_header_height'
-const CURRENT_DIFFICULTY_HEIGHT_KEY = 'current_difficulty_height'
-const CHUNK_SIZE = 100
 const protos = require('../protos')
+const sleep = require('./sleep')
+
+let blockSyncLock = false
+let difficultySyncLock = false
+const CHUNK_SIZE = 1000
+
+const REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT = 'current_block_height'
+const REDIS_STORE_KEY_HEADER_CURRENT_HEIGHT = 'current_header_height'
+const REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT = 'current_difficulty_height'
+
+const REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP = 'transactions_by_time'
+const REDIS_STORE_KEY_TRANSACTIONS_TOTAL = 'transactions_total'
+const REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT = 'difficulties_by_height'
+const REDIS_STORE_KEY_BLOCKS_BY_HEIGHT = 'blocks_by_height'
+const REDIS_STORE_KEY_BLOCKS_BY_TIME = 'blocks_by_time'
 
 const difficultyHeight = async () => {
-  return +(await redis.get(CURRENT_DIFFICULTY_HEIGHT_KEY) || 0)
+  return +(await redis.get(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT) || 0)
 }
 
 const blockHeight = async () => {
-  return +(await redis.get(CURRENT_BLOCK_HEIGHT_KEY) || 0)
+  return +(await redis.get(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT) || 0)
 }
 
 const headerHeight = async () => {
-  return +(await redis.get(CURRENT_HEADER_HEIGHT_KEY) || 0)
+  return +(await redis.get(REDIS_STORE_KEY_HEADER_CURRENT_HEIGHT) || 0)
 }
 
-const getTransactions = async (from) => {
-  const members = await redis.zrangebyscore('transactions', from, '+inf')
+const getTransactions = async (from, to = '+inf') => {
+  const members = await redis.zrangebyscore(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, from, to)
   const formattedMembers = members.map(m => {
-    const [height, timestamp, transactions] = m.split(':')
+    const [height, timestamp, transactions, fee] = m.split(':')
     return {
       height: +height,
       timestamp: +timestamp,
-      transactions: +transactions
+      transactions: +transactions,
+      fee: +fee
     }
   })
   return formattedMembers
 }
 
+const getDifficulties = async (from, to = '+inf') => {
+  const members = await redis.zrangebyscore(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, from, to)
+  return members.map(m => {
+    const [height, difficulty, estimatedHashRate] = m.split(':').map(n => +n)
+    return {
+      height, difficulty, estimatedHashRate
+    }
+  })
+}
+
+const getBlocks = async (from, to) => {
+  return (await redis.zrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, from, to)).map(JSON.parse)
+}
+
 const getChainRunningTime = async () => {
-  const last = await redis.zrange('transactions', -1, -1, 'withscores')
-  const first = await redis.zrange('transactions', 0, 0, 'withscores')
+  const last = await redis.zrange(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, -1, -1, 'withscores')
+  const first = await redis.zrange(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, 0, 0, 'withscores')
   const start = +first.pop()
   const end = +last.pop()
   return {
@@ -44,10 +70,10 @@ const getChainRunningTime = async () => {
 }
 
 const getTotalTransactions = async () => {
-  return +(await redis.get('total_transactions'))
+  return +(await redis.get(REDIS_STORE_KEY_TRANSACTIONS_TOTAL))
 }
 
-const setTransactions = async (blockData) => {
+const setTransactionsCount = async (blockData) => {
   const {
     block: {
       header: { height, timestamp: { seconds } },
@@ -56,25 +82,30 @@ const setTransactions = async (blockData) => {
   } = blockData
   console.debug('Settings transactions', height)
   const transactions = kernels.length
+  const totalFee = kernels.map(k => +k.fee).reduce((acc, b) => acc + b, 0)
   const timestamp = +seconds * 1000
-  const member = [height, timestamp, transactions].join(':')
-  await redis.zadd('transactions', timestamp, member)
-  await redis.incrby('total_transactions', transactions)
+  const member = [height, timestamp, transactions, totalFee].join(':')
+  await redis.zadd(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, timestamp, member)
+  await redis.incrby(REDIS_STORE_KEY_TRANSACTIONS_TOTAL, transactions)
 }
 
 const syncDifficulties = async () => {
-  let currentCacheBlockHeight = await difficultyHeight()
+  if (difficultySyncLock) {
+    console.log('syncDifficulties locked')
+  }
+  difficultySyncLock = true
+  let currentCacheDifficultyHeight = await difficultyHeight()
   // Get the tip
-  const currentChainBlockHeight = await protos.baseNode.GetChainTip()
-  console.debug('Syncing Difficulties - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainBlockHeight)
-  let currentBlockHeight = currentCacheBlockHeight
+  const currentChainTip = await protos.baseNode.GetChainTip()
+  console.debug('Syncing Difficulties - Cache Height:', currentCacheDifficultyHeight, 'Chain Height:', currentChainTip)
+  let currentBlockHeight = currentCacheDifficultyHeight
 
-  while (currentCacheBlockHeight < currentChainBlockHeight) {
+  while (currentCacheDifficultyHeight < currentChainTip) {
     // Fetch all the difficulties for the range
-    const startHeight = currentCacheBlockHeight
-    const endHeight = currentCacheBlockHeight + 1000
+    const startHeight = currentCacheDifficultyHeight
+    const endHeight = Math.min(currentCacheDifficultyHeight + CHUNK_SIZE, currentChainTip)
 
-    console.debug('Fetching block heights', startHeight, ' - ', endHeight, ' / ', currentChainBlockHeight)
+    console.debug('Fetching difficulty heights', startHeight, ' - ', endHeight, ' / ', currentChainTip)
 
     const difficulties = await protos.baseNode.GetNetworkDifficulty({
       from_tip: 0,
@@ -90,19 +121,25 @@ const syncDifficulties = async () => {
       const member = [height, difficulty, estimatedHashRate].join(':')
       const blockHeight = height
 
-      await redis.zadd('difficulties', height, member)
+      await redis.zadd(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, height, member)
       if (blockHeight > currentBlockHeight) {
         currentBlockHeight = blockHeight
       }
     }
 
-    await redis.set(CURRENT_DIFFICULTY_HEIGHT_KEY, currentBlockHeight)
-    console.debug('Setting new height', currentBlockHeight)
-    currentCacheBlockHeight = currentBlockHeight
+    await redis.set(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT, currentBlockHeight)
+    console.debug('Setting new difficulty height', currentBlockHeight)
+    await sleep(1000)
+    currentCacheDifficultyHeight = currentBlockHeight
   }
+  difficultySyncLock = false
 }
 
 const syncBlocks = async () => {
+  if (blockSyncLock) {
+    console.log('syncBlocks locked')
+  }
+  blockSyncLock = true
   let currentCacheBlockHeight = await blockHeight()
   // Get the tip
   const currentChainBlockHeight = await protos.baseNode.GetChainTip()
@@ -111,66 +148,40 @@ const syncBlocks = async () => {
   let currentBlockHeight = currentCacheBlockHeight
   while (currentCacheBlockHeight < currentChainBlockHeight) {
     // Fetch all the blocks for the range
-    const heights = range(currentCacheBlockHeight, Math.min(+currentCacheBlockHeight + CHUNK_SIZE, +currentChainBlockHeight))
+    const heights = range(currentCacheBlockHeight, Math.min(CHUNK_SIZE, currentChainBlockHeight - currentCacheBlockHeight), true)
+
     console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainBlockHeight)
     const blocks = await protos.baseNode.GetBlocks(heights)
 
     for (const i in blocks) {
       const blockData = blocks[i]
-      const { block: { header: { height } } } = blockData
+      const { block: { header: { height, timestamp: { seconds } } } } = blockData
       const blockHeight = +height
-      console.debug('Setting block height cache', blockHeight)
-      await redis.set(`block_${blockHeight}`, JSON.stringify(blockData))
-      await setTransactions(blockData)
+      const blockDataString = JSON.stringify(blockData)
+      const milliseconds = +seconds * 1000
+      await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
+      await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_TIME, milliseconds, blockDataString)
+      await setTransactionsCount(blockData)
       if (blockHeight > currentBlockHeight) {
         currentBlockHeight = blockHeight
       }
     }
-    await redis.set(CURRENT_BLOCK_HEIGHT_KEY, currentBlockHeight)
-    console.debug('Setting new height', currentBlockHeight)
+    await redis.set(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT, currentBlockHeight)
+    console.debug('Setting new block height', currentBlockHeight)
+    await sleep(1000)
     currentCacheBlockHeight = currentBlockHeight
   }
-}
-
-const syncHeaders = async () => {
-  let currentCacheHeaderHeight = await headerHeight()
-  // Get the tip
-  const currentChainHeaderHeight = await protos.baseNode.GetChainTip()
-
-  console.debug('Syncing Headers - Cache Height:', currentCacheHeaderHeight, 'Chain Height:', currentChainHeaderHeight)
-  let currentHeaderHeight = currentCacheHeaderHeight
-  while (currentCacheHeaderHeight < currentChainHeaderHeight) {
-    // Fetch all the blocks for the range
-    console.debug('Fetching heights', currentCacheHeaderHeight, ' - ', +currentCacheHeaderHeight + CHUNK_SIZE, ' / ', currentChainHeaderHeight)
-    const headers = await protos.baseNode.ListHeaders({
-      from_height: +currentCacheHeaderHeight,
-      num_headers: CHUNK_SIZE,
-      sorting: 1
-    })
-
-    for (const i in headers) {
-      const headerData = headers[i]
-      const { height } = headerData
-      const headerHeight = +height
-      console.debug('Setting header height cache', headerHeight)
-      await redis.set(`header_${headerHeight}`, JSON.stringify(headerData))
-      if (headerHeight > currentHeaderHeight) {
-        currentHeaderHeight = headerHeight
-      }
-    }
-    await redis.set(CURRENT_HEADER_HEIGHT_KEY, currentHeaderHeight)
-    console.debug('Setting new height', currentHeaderHeight)
-    currentCacheHeaderHeight = currentHeaderHeight
-  }
+  blockSyncLock = false
 }
 
 module.exports = {
   blockHeight,
   headerHeight,
+  getBlocks,
   getTransactions,
   getTotalTransactions,
   getChainRunningTime,
+  getDifficulties,
   syncBlocks,
-  syncHeaders,
   syncDifficulties
 }
