@@ -1,6 +1,4 @@
 function emission (initial, decay, tail, block) {
-  console.log(initial, decay, tail, block)
-
   function calc (block) {
     return (Math.trunc(+initial * Math.pow(+decay, +block))) + +tail
   }
