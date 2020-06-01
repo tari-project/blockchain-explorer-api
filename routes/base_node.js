@@ -82,6 +82,14 @@ router.post('/sync', simpleAuth, async (req, res) => {
   })
 })
 
+router.post('/flush', simpleAuth, async (req, res) => {
+  redis.flushall()
+  return res.status(202).json({
+    status: 'OK',
+    message: 'Flush ALL initiated'
+  })
+})
+
 router.get('/calc-timing', async (req, res) => {
   try {
     const data = await baseNode.GetCalcTiming(req.query)
