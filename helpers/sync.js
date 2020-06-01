@@ -5,6 +5,7 @@ const sleep = require('./sleep')
 
 let blockSyncLock = false
 let difficultySyncLock = false
+let constantsSyncLock = false
 const CHUNK_SIZE = 1000
 
 const REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT = 'current_block_height'
@@ -16,6 +17,7 @@ const REDIS_STORE_KEY_TRANSACTIONS_TOTAL = 'transactions_total'
 const REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT = 'difficulties_by_height'
 const REDIS_STORE_KEY_BLOCKS_BY_HEIGHT = 'blocks_by_height'
 const REDIS_STORE_KEY_BLOCKS_BY_TIME = 'blocks_by_time'
+const REDIS_STORE_KEY_CONSTANTS = 'constants'
 
 const difficultyHeight = async () => {
   return +(await redis.get(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT) || 0)
@@ -29,6 +31,13 @@ const headerHeight = async () => {
   return +(await redis.get(REDIS_STORE_KEY_HEADER_CURRENT_HEIGHT) || 0)
 }
 
+const getConstants = async () => {
+  const constantsString = await redis.get(REDIS_STORE_KEY_CONSTANTS)
+  if (!constantsString) {
+    return await syncConstants()
+  }
+  return JSON.parse(constantsString)
+}
 const getTransactions = async (from, to = '+inf') => {
   const members = await redis.zrangebyscore(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, from, to)
   const formattedMembers = members.map(m => {
@@ -92,6 +101,7 @@ const setTransactionsCount = async (blockData) => {
 const syncDifficulties = async () => {
   if (difficultySyncLock) {
     console.log('syncDifficulties locked')
+    return
   }
   difficultySyncLock = true
   let currentCacheDifficultyHeight = await difficultyHeight()
@@ -138,6 +148,7 @@ const syncDifficulties = async () => {
 const syncBlocks = async () => {
   if (blockSyncLock) {
     console.log('syncBlocks locked')
+    return
   }
   blockSyncLock = true
   let currentCacheBlockHeight = await blockHeight()
@@ -174,14 +185,28 @@ const syncBlocks = async () => {
   blockSyncLock = false
 }
 
+const syncConstants = async () => {
+  if (constantsSyncLock) {
+    console.log('syncConstants Locked')
+    return
+  }
+  constantsSyncLock = true
+  const constants = await protos.baseNode.GetConstants()
+  await redis.set(REDIS_STORE_KEY_CONSTANTS, JSON.stringify(constants))
+  constantsSyncLock = false
+  return constants
+}
+
 module.exports = {
   blockHeight,
   headerHeight,
+  getConstants,
   getBlocks,
   getTransactions,
   getTotalTransactions,
   getChainRunningTime,
   getDifficulties,
   syncBlocks,
-  syncDifficulties
+  syncDifficulties,
+  syncConstants
 }
