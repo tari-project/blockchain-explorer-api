@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 3
   tari:
-    image: quay.io/krakaw/tari-docker:latest
+    image: quay.io/tarilabs/tari_base_node:latest
     volumes:
       - "$PWD/_data/tari:/root/.tari"
     ports:
