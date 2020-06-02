@@ -1,6 +1,9 @@
 // Redis
 const redis = require('redis')
 const syncClient = redis.createClient(process.env.REDIS_URL)
+syncClient.on('error', (e) => {
+  console.error(e)
+})
 const { promisify } = require('util')
 const client = {
   _client: syncClient,
