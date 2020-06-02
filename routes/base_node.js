@@ -168,13 +168,12 @@ router.get('/tokens-in-circulation', async (req, res) => {
 
     let heights = []
     if (start) {
-      heights = range(start, end - start, false)
+      heights = range(start, Math.max(end - start, 0), false)
     } else {
       const fromTip = +(req.query.from_tip || 1)
-      heights = range(chainTip - fromTip, fromTip, false)
+      heights = range(Math.max(chainTip - fromTip, 0), fromTip, false)
     }
     heights = heights.filter((_, i) => i % step === 0)
-    console.log(heights)
 
     const data = []
     for (const i in heights) {
@@ -188,6 +187,7 @@ router.get('/tokens-in-circulation', async (req, res) => {
     }
     return res.json(data)
   } catch (e) {
+    console.error(e)
     return res.sendStatus(500).json(e)
   }
 })
