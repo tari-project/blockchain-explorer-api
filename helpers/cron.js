@@ -3,7 +3,9 @@ const sync = require('./sync')
 const options = { scheduled: true }
 
 const schedule = () => {
+  console.debug('Starting scheduled sync')
   // Sync constants only needs to happen on load
+  console.log('Syncing Constants')
   sync.syncConstants().catch(e => {
     console.error('Sync Constants Error', e)
   })

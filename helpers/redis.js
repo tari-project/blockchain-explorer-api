@@ -1,6 +1,7 @@
 // Redis
 const redis = require('redis')
-const syncClient = redis.createClient(process.env.REDIS_URL)
+const { redisUrl } = require('../config')
+const syncClient = redis.createClient(redisUrl)
 syncClient.on('error', (e) => {
   console.error(e)
 })
@@ -13,6 +14,7 @@ const client = {
   set: promisify(syncClient.set).bind(syncClient),
   zadd: promisify(syncClient.zadd).bind(syncClient),
   zrangebyscore: promisify(syncClient.zrangebyscore).bind(syncClient),
+  zremrangebyscore: promisify(syncClient.zremrangebyscore).bind(syncClient),
   zrange: promisify(syncClient.zrange).bind(syncClient),
   flushall: promisify(syncClient.flushall).bind(syncClient)
 }
