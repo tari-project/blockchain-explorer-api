@@ -33,7 +33,7 @@ router.get('/chain-metadata', async (req, res) => {
           transactionTimes += transactions[i + 1].timestamp - t.timestamp
         }
       })
-      avgBlockTimes = transactionTimes / (transactions.length - 1)
+      avgBlockTimes = Math.trunc((transactionTimes / (transactions.length - 1)) / 1000)
     }
     const averageDifficulty = {
       difficulty: 0,
