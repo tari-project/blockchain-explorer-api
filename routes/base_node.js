@@ -49,6 +49,8 @@ router.get('/chain-metadata', async (req, res) => {
     }
 
     return res.json({
+      startMs,
+      blocksFromTip,
       blockHeight: chainTip,
       totalTransactions,
       chainRunningTime,
