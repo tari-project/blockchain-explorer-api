@@ -12,7 +12,6 @@ const LOCKS = {
 const CHUNK_SIZE = 1000
 
 const REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT = 'current_block_height'
-const REDIS_STORE_KEY_HEADER_CURRENT_HEIGHT = 'current_header_height'
 const REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT = 'current_difficulty_height'
 
 const REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP = 'transactions_by_time'
@@ -28,10 +27,6 @@ const difficultyHeight = async () => {
 
 const blockHeight = async () => {
   return +(await redis.get(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT) || 0)
-}
-
-const headerHeight = async () => {
-  return +(await redis.get(REDIS_STORE_KEY_HEADER_CURRENT_HEIGHT) || 0)
 }
 
 const getConstants = async () => {
@@ -92,11 +87,11 @@ const setTransactionsCount = async (blockData) => {
       body: { kernels }
     }
   } = blockData
-  console.debug('Settings transactions', height)
   const transactions = kernels.length
   const totalFee = kernels.map(k => +k.fee).reduce((acc, b) => acc + b, 0)
   const timestamp = +seconds * 1000
   const member = [height, timestamp, transactions, totalFee].join(':')
+  await redis.zremrangebyscore(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, timestamp, timestamp)
   await redis.zadd(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, timestamp, member)
   await redis.incrby(REDIS_STORE_KEY_TRANSACTIONS_TOTAL, transactions)
 }
@@ -131,11 +126,11 @@ const syncDifficulties = async () => {
         let { difficulty, estimated_hash_rate: estimatedHashRate, height } = difficulties[i]
         difficulty = +difficulty
         estimatedHashRate = +estimatedHashRate
-        height = +height
-        const member = [height, difficulty, estimatedHashRate].join(':')
-        const blockHeight = height
+        const blockHeight = +height
+        const member = [blockHeight, difficulty, estimatedHashRate].join(':')
 
-        await redis.zadd(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, height, member)
+        await redis.zremrangebyscore(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, blockHeight, blockHeight)
+        await redis.zadd(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, blockHeight, member)
         if (blockHeight > currentBlockHeight) {
           currentBlockHeight = blockHeight
         }
@@ -162,15 +157,14 @@ const syncBlocks = async () => {
   try {
     let currentCacheBlockHeight = await blockHeight()
     // Get the tip
-    const currentChainBlockHeight = await protos.baseNode.GetChainTip()
-
-    console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainBlockHeight)
+    const currentChainTip = await protos.baseNode.GetChainTip()
+    console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
     let currentBlockHeight = currentCacheBlockHeight
-    while (currentCacheBlockHeight < currentChainBlockHeight) {
+    while (currentCacheBlockHeight < currentChainTip) {
       // Fetch all the blocks for the range
-      const heights = range(currentCacheBlockHeight, Math.min(CHUNK_SIZE, currentChainBlockHeight - currentCacheBlockHeight), true)
+      const heights = range(currentCacheBlockHeight, Math.min(CHUNK_SIZE, currentChainTip - currentCacheBlockHeight) + 1, true)
 
-      console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainBlockHeight)
+      console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainTip)
       const blocks = await protos.baseNode.GetBlocks(heights)
 
       for (const i in blocks) {
@@ -179,7 +173,9 @@ const syncBlocks = async () => {
         const blockHeight = +height
         const blockDataString = JSON.stringify(blockData)
         const milliseconds = +seconds * 1000
+        await redis.zremrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockHeight)
         await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
+        await redis.zremrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_TIME, blockHeight, blockHeight)
         await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_TIME, milliseconds, blockDataString)
         await setTransactionsCount(blockData)
         if (blockHeight > currentBlockHeight) {
@@ -206,6 +202,7 @@ const syncConstants = async () => {
   LOCKS.constants = true
   let constants = {}
   try {
+    console.debug('Setting constants')
     constants = await protos.baseNode.GetConstants()
     await redis.set(REDIS_STORE_KEY_CONSTANTS, JSON.stringify(constants))
   } catch (e) {
@@ -219,7 +216,6 @@ const syncConstants = async () => {
 
 module.exports = {
   blockHeight,
-  headerHeight,
   getConstants,
   getBlocks,
   getTransactions,

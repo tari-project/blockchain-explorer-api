@@ -35,7 +35,7 @@ const responsify = (call, responseIsArray, shouldConvertBuffToHex) => {
       resolve(data)
     })
     call.on('status', function (status) {
-      console.debug('grpc status', status)
+      // console.debug('grpc status', status)
     })
   })
 }

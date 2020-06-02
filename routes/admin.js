@@ -4,7 +4,7 @@ const redis = require('../helpers/redis')
 const { simpleAuth } = require('../middleware/auth')
 const { baseNode } = require('../protos')
 const {
-
+  syncConstants,
   syncBlocks,
   syncDifficulties
 } = require('../helpers/sync')
@@ -15,7 +15,7 @@ router.post('/proto', simpleAuth, async (req, res) => {
 })
 
 router.post('/flush', simpleAuth, async (req, res) => {
-  redis.flushall()
+  await redis.flushall()
   return res.status(202).json({
     status: 'OK',
     message: 'Flush ALL initiated'
@@ -23,8 +23,18 @@ router.post('/flush', simpleAuth, async (req, res) => {
 })
 
 router.post('/sync', simpleAuth, async (req, res) => {
-  syncBlocks()
-  syncDifficulties()
+  const { type = 'all' } = req.query
+  if (type === 'all' || type === 'blocks') {
+    syncBlocks()
+  }
+  if (type === 'all' || type === 'difficulties') {
+    syncDifficulties()
+  }
+
+  if (type === 'all' || type === 'constants') {
+    syncConstants()
+  }
+
   // syncHeaders()
   return res.status(202).json({
     status: 'OK',

@@ -3,6 +3,7 @@ const fetch = require('node-fetch')
 const md5 = require('md5')
 const fs = require('fs')
 const path = require('path')
+const { protoRemoteUrl } = require('../../config')
 
 const defaultHeightOrBlockGroupRequest = {
   from_tip: 30,
@@ -21,7 +22,7 @@ module.exports = (client) => {
       return reject(e)
     },
     _checkVersion: async function (saveNewVersion) {
-      const response = await fetch(process.env.PROTO_REMOTE_URL)
+      const response = await fetch(protoRemoteUrl)
       const remoteProto = await response.text()
       const remoteMd5 = md5(remoteProto)
       const localPath = path.join(__dirname, '/base_node.proto')
