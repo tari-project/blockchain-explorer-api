@@ -185,12 +185,20 @@ router.get('/tokens-in-circulation', async (req, res) => {
   try {
     const constants = await getConstants()
     const chainTip = await blockHeight()
-    const fromTip = +(req.query.from_tip || 1)
-    const heights = range(chainTip - fromTip, fromTip, false)
+
+    const start = +(req.query.start || 0)
+    const end = +(req.query.end || start)
+    let heights = []
+    if (start) {
+      heights = range(start, end - start, false)
+    } else {
+      const fromTip = +(req.query.from_tip || 1)
+      heights = range(chainTip - fromTip, fromTip, false)
+    }
 
     const data = []
     for (const i in heights) {
-      const height = heights[i]
+      const height = +heights[i]
       // TODO NBNBNBNB Figure out why we need this magic number of 31.... seriously dirty hack, but midnight is upon us.
       const totalTokensInCirculation = emission(constants.emission_initial, constants.emission_decay, constants.emission_tail, height) + 31
       data.push({
