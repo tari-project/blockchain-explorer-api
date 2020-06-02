@@ -20,7 +20,9 @@ app.use(express.static(path.join(__dirname, 'public')))
 
 /** Routes */
 const baseNodeRouter = require('./routes/base_node')
+const adminRouter = require('./routes/admin')
 
 app.use('/', baseNodeRouter)
+app.use('/admin', adminRouter)
 
 module.exports = app

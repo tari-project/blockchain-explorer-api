@@ -3,9 +3,12 @@ const { range } = require('./array')
 const protos = require('../protos')
 const sleep = require('./sleep')
 
-let blockSyncLock = false
-let difficultySyncLock = false
-let constantsSyncLock = false
+const LOCKS = {
+  blocks: false,
+  difficulties: false,
+  constants: false
+}
+
 const CHUNK_SIZE = 1000
 
 const REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT = 'current_block_height'
@@ -99,101 +102,118 @@ const setTransactionsCount = async (blockData) => {
 }
 
 const syncDifficulties = async () => {
-  if (difficultySyncLock) {
+  if (LOCKS.difficulties) {
     console.log('syncDifficulties locked')
     return
   }
-  difficultySyncLock = true
-  let currentCacheDifficultyHeight = await difficultyHeight()
-  // Get the tip
-  const currentChainTip = await protos.baseNode.GetChainTip()
-  console.debug('Syncing Difficulties - Cache Height:', currentCacheDifficultyHeight, 'Chain Height:', currentChainTip)
-  let currentBlockHeight = currentCacheDifficultyHeight
+  LOCKS.difficulties = true
+  try {
+    let currentCacheDifficultyHeight = await difficultyHeight()
+    // Get the tip
+    const currentChainTip = await protos.baseNode.GetChainTip()
+    console.debug('Syncing Difficulties - Cache Height:', currentCacheDifficultyHeight, 'Chain Height:', currentChainTip)
+    let currentBlockHeight = currentCacheDifficultyHeight
 
-  while (currentCacheDifficultyHeight < currentChainTip) {
-    // Fetch all the difficulties for the range
-    const startHeight = currentCacheDifficultyHeight
-    const endHeight = Math.min(currentCacheDifficultyHeight + CHUNK_SIZE, currentChainTip)
+    while (currentCacheDifficultyHeight < currentChainTip) {
+      // Fetch all the difficulties for the range
+      const startHeight = currentCacheDifficultyHeight
+      const endHeight = Math.min(currentCacheDifficultyHeight + CHUNK_SIZE, currentChainTip)
 
-    console.debug('Fetching difficulty heights', startHeight, ' - ', endHeight, ' / ', currentChainTip)
+      console.debug('Fetching difficulty heights', startHeight, ' - ', endHeight, ' / ', currentChainTip)
 
-    const difficulties = await protos.baseNode.GetNetworkDifficulty({
-      from_tip: 0,
-      start_height: startHeight,
-      end_height: endHeight
-    })
+      const difficulties = await protos.baseNode.GetNetworkDifficulty({
+        from_tip: 0,
+        start_height: startHeight,
+        end_height: endHeight
+      })
 
-    for (const i in difficulties) {
-      let { difficulty, estimated_hash_rate: estimatedHashRate, height } = difficulties[i]
-      difficulty = +difficulty
-      estimatedHashRate = +estimatedHashRate
-      height = +height
-      const member = [height, difficulty, estimatedHashRate].join(':')
-      const blockHeight = height
+      for (const i in difficulties) {
+        let { difficulty, estimated_hash_rate: estimatedHashRate, height } = difficulties[i]
+        difficulty = +difficulty
+        estimatedHashRate = +estimatedHashRate
+        height = +height
+        const member = [height, difficulty, estimatedHashRate].join(':')
+        const blockHeight = height
 
-      await redis.zadd(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, height, member)
-      if (blockHeight > currentBlockHeight) {
-        currentBlockHeight = blockHeight
+        await redis.zadd(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, height, member)
+        if (blockHeight > currentBlockHeight) {
+          currentBlockHeight = blockHeight
+        }
       }
-    }
 
-    await redis.set(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT, currentBlockHeight)
-    console.debug('Setting new difficulty height', currentBlockHeight)
-    await sleep(1000)
-    currentCacheDifficultyHeight = currentBlockHeight
+      await redis.set(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT, currentBlockHeight)
+      console.debug('Setting new difficulty height', currentBlockHeight)
+      await sleep(1000)
+      currentCacheDifficultyHeight = currentBlockHeight
+    }
+  } catch (e) {
+    console.error('Error syncDifficulties', e)
+  } finally {
+    LOCKS.difficulties = false
   }
-  difficultySyncLock = false
 }
 
 const syncBlocks = async () => {
-  if (blockSyncLock) {
+  if (LOCKS.blocks) {
     console.log('syncBlocks locked')
     return
   }
-  blockSyncLock = true
-  let currentCacheBlockHeight = await blockHeight()
-  // Get the tip
-  const currentChainBlockHeight = await protos.baseNode.GetChainTip()
+  LOCKS.blocks = true
+  try {
+    let currentCacheBlockHeight = await blockHeight()
+    // Get the tip
+    const currentChainBlockHeight = await protos.baseNode.GetChainTip()
 
-  console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainBlockHeight)
-  let currentBlockHeight = currentCacheBlockHeight
-  while (currentCacheBlockHeight < currentChainBlockHeight) {
-    // Fetch all the blocks for the range
-    const heights = range(currentCacheBlockHeight, Math.min(CHUNK_SIZE, currentChainBlockHeight - currentCacheBlockHeight), true)
+    console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainBlockHeight)
+    let currentBlockHeight = currentCacheBlockHeight
+    while (currentCacheBlockHeight < currentChainBlockHeight) {
+      // Fetch all the blocks for the range
+      const heights = range(currentCacheBlockHeight, Math.min(CHUNK_SIZE, currentChainBlockHeight - currentCacheBlockHeight), true)
 
-    console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainBlockHeight)
-    const blocks = await protos.baseNode.GetBlocks(heights)
+      console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainBlockHeight)
+      const blocks = await protos.baseNode.GetBlocks(heights)
 
-    for (const i in blocks) {
-      const blockData = blocks[i]
-      const { block: { header: { height, timestamp: { seconds } } } } = blockData
-      const blockHeight = +height
-      const blockDataString = JSON.stringify(blockData)
-      const milliseconds = +seconds * 1000
-      await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
-      await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_TIME, milliseconds, blockDataString)
-      await setTransactionsCount(blockData)
-      if (blockHeight > currentBlockHeight) {
-        currentBlockHeight = blockHeight
+      for (const i in blocks) {
+        const blockData = blocks[i]
+        const { block: { header: { height, timestamp: { seconds } } } } = blockData
+        const blockHeight = +height
+        const blockDataString = JSON.stringify(blockData)
+        const milliseconds = +seconds * 1000
+        await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
+        await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_TIME, milliseconds, blockDataString)
+        await setTransactionsCount(blockData)
+        if (blockHeight > currentBlockHeight) {
+          currentBlockHeight = blockHeight
+        }
       }
+      await redis.set(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT, currentBlockHeight)
+      console.debug('Setting new block height', currentBlockHeight)
+      await sleep(1000)
+      currentCacheBlockHeight = currentBlockHeight
     }
-    await redis.set(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT, currentBlockHeight)
-    console.debug('Setting new block height', currentBlockHeight)
-    await sleep(1000)
-    currentCacheBlockHeight = currentBlockHeight
+  } catch (e) {
+    console.error('Error syncBlocks', e)
+  } finally {
+    LOCKS.blocks = false
   }
-  blockSyncLock = false
 }
 
 const syncConstants = async () => {
-  if (constantsSyncLock) {
+  if (LOCKS.constants) {
     console.log('syncConstants Locked')
     return
   }
-  constantsSyncLock = true
-  const constants = await protos.baseNode.GetConstants()
-  await redis.set(REDIS_STORE_KEY_CONSTANTS, JSON.stringify(constants))
-  constantsSyncLock = false
+  LOCKS.constants = true
+  let constants = {}
+  try {
+    constants = await protos.baseNode.GetConstants()
+    await redis.set(REDIS_STORE_KEY_CONSTANTS, JSON.stringify(constants))
+  } catch (e) {
+    console.error('Error syncConstants', e)
+  } finally {
+    LOCKS.constants = false
+  }
+
   return constants
 }
 
@@ -208,5 +228,6 @@ module.exports = {
   getDifficulties,
   syncBlocks,
   syncDifficulties,
-  syncConstants
+  syncConstants,
+  LOCKS
 }

@@ -16,7 +16,11 @@ const defaultIntegerValue = {
 
 module.exports = (client) => {
   return {
-    _checkVersion: async (saveNewVersion) => {
+    _onError: async function (e, reject) {
+      console.error('grpc error', e)
+      return reject(e)
+    },
+    _checkVersion: async function (saveNewVersion) {
       const response = await fetch(process.env.PROTO_REMOTE_URL)
       const remoteProto = await response.text()
       const remoteMd5 = md5(remoteProto)
@@ -40,7 +44,7 @@ module.exports = (client) => {
     GetBlocks: async (heights) => {
       return responsify(client.GetBlocks({ heights }), true, true)
     },
-    ListHeaders: async (listHeadersRequest) => {
+    ListHeaders: async function (listHeadersRequest) {
       const options = {
         from_height: null,
         num_headers: null,
@@ -49,7 +53,7 @@ module.exports = (client) => {
       }
       return responsify(client.ListHeaders(options), true, true)
     },
-    GetCalcTiming: async (heightRequest) => {
+    GetCalcTiming: async function (heightRequest) {
       const options = {
         ...defaultHeightOrBlockGroupRequest,
         ...heightRequest
@@ -57,23 +61,23 @@ module.exports = (client) => {
       return new Promise((resolve, reject) => {
         client.GetCalcTiming(options, (error, response) => {
           if (error) {
-            reject(error)
+            return this._onError(error, reject)
           }
           resolve(response)
         })
       })
     },
-    GetConstants: () => {
+    GetConstants: async function () {
       return new Promise((resolve, reject) => {
         client.GetConstants(undefined, (error, response) => {
           if (error) {
-            reject(error)
+            return this._onError(error, reject)
           }
           resolve(response)
         })
       })
     },
-    GetBlockSize: async (blockGroupRequest) => {
+    GetBlockSize: async function (blockGroupRequest) {
       const options = {
         ...defaultHeightOrBlockGroupRequest,
         ...blockGroupRequest
@@ -81,13 +85,13 @@ module.exports = (client) => {
       return new Promise((resolve, reject) => {
         client.GetBlockSize(options, (error, response) => {
           if (error) {
-            reject(error)
+            return this._onError(error, reject)
           }
           resolve(response)
         })
       })
     },
-    GetBlockFees: async (blockGroupRequest) => {
+    GetBlockFees: async function (blockGroupRequest) {
       const options = {
         ...defaultHeightOrBlockGroupRequest,
         ...blockGroupRequest
@@ -95,23 +99,23 @@ module.exports = (client) => {
       return new Promise((resolve, reject) => {
         client.GetBlockFees(options, (error, response) => {
           if (error) {
-            reject(error)
+            return this._onError(error, reject)
           }
           resolve(response)
         })
       })
     },
-    GetVersion: async () => {
+    GetVersion: async function () {
       return new Promise((resolve, reject) => {
         client.GetVersion(undefined, (error, response) => {
           if (error) {
-            reject(error)
+            return this._onError(error, reject)
           }
           resolve(response)
         })
       })
     },
-    GetTokensInCirculation: async (integerValue) => {
+    GetTokensInCirculation: async function (integerValue) {
       const options = {
         ...defaultIntegerValue,
         ...integerValue
@@ -119,18 +123,17 @@ module.exports = (client) => {
       return new Promise((resolve, reject) => {
         client.GetTokensInCirculation(options, (error, response) => {
           if (error) {
-            reject(error)
+            return this._onError(error, reject)
           }
           resolve(response)
         })
       })
     },
-    GetNetworkDifficulty: async (heightRequest) => {
+    GetNetworkDifficulty: async function (heightRequest) {
       const options = {
         ...defaultHeightOrBlockGroupRequest,
         ...heightRequest
       }
-      console.log(options)
       return responsify(client.GetNetworkDifficulty(options), true, true)
     }
   }

@@ -28,12 +28,14 @@ const responsify = (call, responseIsArray, shouldConvertBuffToHex) => {
       }
     })
     call.on('error', (error) => {
+      console.error('grpc error', error)
       reject(error)
     })
     call.on('end', function (e) {
       resolve(data)
     })
     call.on('status', function (status) {
+      console.debug('grpc status', status)
     })
   })
 }
