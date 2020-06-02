@@ -1,23 +1,76 @@
 const express = require('express')
 const router = express.Router()
 const redis = require('../helpers/redis')
+const { emission } = require('../helpers/tokens')
+const { range } = require('../helpers/array')
 const { redisPageRange } = require('../helpers/paging')
 const {
   blockHeight,
-  headerHeight,
+  getBlocks,
+  getConstants,
   getTransactions,
-  getTotalTransactions,
+  getChainRunningTime,
+  getDifficulties,
   syncBlocks,
-  syncHeaders
+  syncDifficulties
 } = require('../helpers/sync')
 const { baseNode } = require('../protos')
 const { simpleAuth } = require('../middleware/auth')
 
+router.get('/chain-metadata', async (req, res) => {
+  try {
+    const now = (new Date()).getTime()
+    const { start: startMs = now - (24 * 60 * 60 * 1000) } = req.query
+    const blocksFromTip = Math.abs((now - startMs) / 1000 / 120) * -1
+    const [chainTip, transactions, chainRunningTime, difficulties] = await Promise.all([blockHeight(), getTransactions(startMs), getChainRunningTime(), getDifficulties(blocksFromTip)])
+
+    const totalTransactions = transactions.reduce((acc, b) => acc + b.transactions, 0)
+    const totalFees = transactions.reduce((acc, b) => acc + b.fee, 0)
+    const averageFee = totalFees / totalTransactions
+
+    let transactionTimes = 0
+    let avgBlockTimes = 0
+    if (transactions.length > 2) {
+      transactions.forEach((t, i) => {
+        if (transactions.length > i + 1) {
+          transactionTimes += transactions[i + 1].timestamp - t.timestamp
+        }
+      })
+      avgBlockTimes = transactionTimes / (transactions.length - 1)
+    }
+    const averageDifficulty = {
+      difficulty: 0,
+      estimatedHashRate: 0
+    }
+    if (difficulties.length > 0) {
+      difficulties.forEach(d => {
+        averageDifficulty.difficulty += d.difficulty
+        averageDifficulty.estimatedHashRate += d.estimatedHashRate
+      })
+      averageDifficulty.difficulty = averageDifficulty.difficulty / difficulties.length
+      averageDifficulty.estimatedHashRate = averageDifficulty.estimatedHashRate / difficulties.length
+    }
+
+    return res.json({
+      blockHeight: chainTip,
+      totalTransactions,
+      chainRunningTime,
+      averageDifficulty,
+      averageFee,
+      avgBlockTimes
+    })
+  } catch (e) {
+    return res.sendStatus(500).json(e)
+  }
+})
+
 router.get('/blocks', async (req, res, next) => {
   try {
     const chainTip = await blockHeight()
-    const { getRange, paging } = redisPageRange(req.query, chainTip, 'block_')
-    const blocks = (await redis.mget(...getRange)).map(JSON.parse)
+    const { getRange, paging } = redisPageRange(req.query, chainTip, '')
+    const start = Math.min(...getRange)
+    const end = Math.max(...getRange)
+    const blocks = (await getBlocks(start, end))
 
     return res.json({ blocks, paging })
   } catch (e) {
@@ -25,26 +78,18 @@ router.get('/blocks', async (req, res, next) => {
   }
 })
 
-router.get('/chain-metadata', async (_, res) => {
-  try {
-    const [chainTip, totalTransactions] = await Promise.all([blockHeight(), getTotalTransactions()])
-
-    return res.json({
-      blockHeight: chainTip,
-      totalTransactions
-    })
-  } catch (e) {
-    return res.sendStatus(500).json(e)
-  }
-})
-
 router.get('/headers', async (req, res, next) => {
   try {
-    const chainTip = await headerHeight()
-    const { getRange, paging } = redisPageRange(req.query, chainTip, 'header_')
-    const headers = (await redis.mget(...getRange)).map(JSON.parse)
+    const chainTip = await blockHeight()
+    const { getRange, paging } = redisPageRange(req.query, chainTip, '')
+    const start = Math.min(...getRange)
+    const end = Math.max(...getRange)
+    const headers = (await getBlocks(start, end)).map(b => {
+      const { block: { header } } = b
+      return header
+    })
 
-    return res.json({ blocks: headers, paging })
+    return res.json({ headers, paging })
   } catch (e) {
     return res.sendStatus(500).json(e)
   }
@@ -75,10 +120,19 @@ router.post('/proto', simpleAuth, async (req, res) => {
 
 router.post('/sync', simpleAuth, async (req, res) => {
   syncBlocks()
-  syncHeaders()
+  syncDifficulties()
+  // syncHeaders()
   return res.status(202).json({
     status: 'OK',
     message: 'Sync initiated.'
+  })
+})
+
+router.post('/flush', simpleAuth, async (req, res) => {
+  redis.flushall()
+  return res.status(202).json({
+    status: 'OK',
+    message: 'Flush ALL initiated'
   })
 })
 
@@ -93,7 +147,7 @@ router.get('/calc-timing', async (req, res) => {
 
 router.get('/constants', async (_, res) => {
   try {
-    const data = await baseNode.GetConstants()
+    const data = await getConstants()
     return res.json(data)
   } catch (e) {
     return res.sendStatus(500).json(e)
@@ -129,7 +183,21 @@ router.get('/version', async (_, res) => {
 
 router.get('/tokens-in-circulation', async (req, res) => {
   try {
-    const data = await baseNode.GetTokensInCirculation(req.query)
+    const constants = await getConstants()
+    const chainTip = await blockHeight()
+    const fromTip = +(req.query.from_tip || 1)
+    const heights = range(chainTip - fromTip, fromTip, false)
+
+    const data = []
+    for (const i in heights) {
+      const height = heights[i]
+      // TODO NBNBNBNB Figure out why we need this magic number of 31.... seriously dirty hack, but midnight is upon us.
+      const totalTokensInCirculation = emission(constants.emission_initial, constants.emission_decay, constants.emission_tail, height) + 31
+      data.push({
+        height,
+        totalTokensInCirculation: totalTokensInCirculation
+      })
+    }
     return res.json(data)
   } catch (e) {
     return res.sendStatus(500).json(e)

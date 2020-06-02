@@ -130,6 +130,7 @@ module.exports = (client) => {
         ...defaultHeightOrBlockGroupRequest,
         ...heightRequest
       }
+      console.log(options)
       return responsify(client.GetNetworkDifficulty(options), true, true)
     }
   }
