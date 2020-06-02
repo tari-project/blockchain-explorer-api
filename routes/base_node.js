@@ -18,8 +18,8 @@ router.get('/chain-metadata', async (req, res) => {
   try {
     const now = (new Date()).getTime()
     const { start: startMs = now - (24 * 60 * 60 * 1000) } = req.query
-    const blocksFromTip = Math.abs((now - startMs) / 1000 / 120) * -1
-    const [chainTip, transactions, chainRunningTime, difficulties] = await Promise.all([blockHeight(), getTransactions(startMs), getChainRunningTime(), getDifficulties(blocksFromTip)])
+    const blocksFromTip = Math.abs((now - startMs) / 1000 / 120)
+    const [chainTip, transactions, chainRunningTime, difficulties] = await Promise.all([blockHeight(), getTransactions(startMs), getChainRunningTime(), getDifficulties(blocksFromTip * -1)])
 
     const totalTransactions = transactions.reduce((acc, b) => acc + b.transactions, 0)
     const totalFees = transactions.reduce((acc, b) => acc + b.fee, 0)
