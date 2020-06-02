@@ -164,6 +164,8 @@ router.get('/tokens-in-circulation', async (req, res) => {
 
     const start = +(req.query.start || 0)
     const end = +(req.query.end || start)
+    const step = +(req.query.step || 1)
+
     let heights = []
     if (start) {
       heights = range(start, end - start, false)
@@ -171,6 +173,8 @@ router.get('/tokens-in-circulation', async (req, res) => {
       const fromTip = +(req.query.from_tip || 1)
       heights = range(chainTip - fromTip, fromTip, false)
     }
+    heights = heights.filter((_, i) => i % step === 0)
+    console.log(heights)
 
     const data = []
     for (const i in heights) {
