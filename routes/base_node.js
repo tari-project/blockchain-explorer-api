@@ -1,8 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { emission } = require('../helpers/tokens')
-const { range } = require('../helpers/array')
+const { rangeInclusive } = require('../helpers/array')
 const { redisPageRange } = require('../helpers/paging')
 const {
   blockHeight,
@@ -159,7 +158,6 @@ router.get('/version', async (_, res) => {
 
 router.get('/tokens-in-circulation', async (req, res) => {
   try {
-    const constants = await getConstants()
     const chainTip = await blockHeight()
 
     const start = +(req.query.start || 0)
@@ -167,24 +165,19 @@ router.get('/tokens-in-circulation', async (req, res) => {
     const step = +(req.query.step || 1)
 
     let heights = []
-    if (start) {
-      heights = range(start, Math.max(end - start, 0), false)
+    if (start || end) {
+      heights = rangeInclusive(start, end)
     } else {
       const fromTip = +(req.query.from_tip || 1)
-      heights = range(Math.max(chainTip - fromTip, 0), fromTip, false)
+      heights = rangeInclusive(Math.max(chainTip - fromTip, 0), chainTip)
     }
     heights = heights.filter((_, i) => i % step === 0)
 
-    const data = []
-    for (const i in heights) {
-      const height = +heights[i]
-      // TODO NBNBNBNB Figure out why we need this magic number of 31.... seriously dirty hack, but midnight is upon us.
-      const totalTokensInCirculation = emission(constants.emission_initial, constants.emission_decay, constants.emission_tail, height) + 31
-      data.push({
-        height,
-        totalTokensInCirculation
-      })
-    }
+    const data = (await baseNode.GetTokensInCirculation(heights)).map(v => ({
+      height: v.height,
+      tokensInCirculation: v.value
+    }))
+
     return res.json(data)
   } catch (e) {
     console.error(e)
