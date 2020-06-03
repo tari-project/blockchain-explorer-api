@@ -174,8 +174,8 @@ router.get('/tokens-in-circulation', async (req, res) => {
     heights = heights.filter((_, i) => i % step === 0)
 
     const data = (await baseNode.GetTokensInCirculation(heights)).map(v => ({
-      height: v.height,
-      tokensInCirculation: v.value
+      height: +v.height,
+      tokensInCirculation: +v.value
     }))
 
     return res.json(data)
