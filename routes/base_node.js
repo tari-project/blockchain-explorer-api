@@ -1,8 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { emission } = require('../helpers/tokens')
-const { range, rangeInclusive } = require('../helpers/array')
+const { rangeInclusive } = require('../helpers/array')
 const { redisPageRange } = require('../helpers/paging')
 const {
   blockHeight,
@@ -159,7 +158,6 @@ router.get('/version', async (_, res) => {
 
 router.get('/tokens-in-circulation', async (req, res) => {
   try {
-    const constants = await getConstants()
     const chainTip = await blockHeight()
 
     const start = +(req.query.start || 0)
