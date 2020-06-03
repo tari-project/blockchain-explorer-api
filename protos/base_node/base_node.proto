@@ -44,7 +44,7 @@ service BaseNode {
     // Get Version
     rpc GetVersion(Empty) returns (StringValue);
     // Get coins in circulation
-    rpc GetTokensInCirculation(IntegerValue) returns (IntegerValue);
+    rpc GetTokensInCirculation(GetBlocksRequest) returns (stream ValueAtHeightResponse);
     // Get network difficulties
     rpc GetNetworkDifficulty(HeightRequest) returns (stream NetworkDifficultyResponse);
 }
@@ -57,6 +57,7 @@ message NetworkDifficultyResponse {
     uint64 difficulty = 1;
     uint64 estimated_hash_rate = 2;
     uint64 height = 3;
+    uint64 timestamp = 4;
 }
 
 // A generic single value response for a specific height
@@ -171,7 +172,7 @@ message ListHeadersRequest {
 // available. Multiple blocks may be queried.e.g. [189092,100023,122424]. The order in which they are returned is not
 // guarenteed.
 message GetBlocksRequest {
-  repeated uint64 heights = 1;
+    repeated uint64 heights = 1;
 }
 
 // The return type of the rpc GetBlocks. Blocks are not guaranteed to be returned in the order requested.
