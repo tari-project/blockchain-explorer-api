@@ -116,19 +116,8 @@ module.exports = (client) => {
         })
       })
     },
-    GetTokensInCirculation: async function (integerValue) {
-      const options = {
-        ...defaultIntegerValue,
-        ...integerValue
-      }
-      return new Promise((resolve, reject) => {
-        client.GetTokensInCirculation(options, (error, response) => {
-          if (error) {
-            return this._onError(error, reject)
-          }
-          resolve(response)
-        })
-      })
+    GetTokensInCirculation: async function (heights) {
+      return responsify(client.GetTokensInCirculation({ heights }), true, true)
     },
     GetNetworkDifficulty: async function (heightRequest) {
       const options = {

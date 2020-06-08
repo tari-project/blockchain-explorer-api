@@ -1,22 +1,29 @@
 version: "3.5"
 services:
+  frontend:
+    image: quay.io/tarilabs/block-explorer-frontend:latest
+    env_file: .env.docker.frontend
+    volumes:
+    - frontend:/app/dist
   api:
-    build:
-      context: .
+    image: quay.io/tarilabs/blockchain-explorer-api:latest
     env_file: .env
     ports:
       - "4000:4000"
     restart: unless-stopped
+    volumes:
+      - frontend:/app/public
     depends_on:
       - tari
       - redis
+      - frontend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000"]
       interval: 10s
       timeout: 5s
       retries: 3
   tari:
-    image: quay.io/krakaw/tari_base_node:latest
+    image: quay.io/tarilabs/tari_base_node:latest
     volumes:
       - "$PWD/_data/tari:/root/.tari"
     ports:
@@ -32,3 +39,6 @@ services:
     command: "redis-server --appendonly yes"
     environment:
       - REDIS_REPLICATION_MODE=master
+volumes:
+  frontend:
+
