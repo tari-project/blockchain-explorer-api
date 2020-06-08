@@ -5,7 +5,6 @@ class Sockets {
   constructor (server, app) {
     this.wss = new WebSocket.Server({ server, path: '/ws' })
     this.app = app
-    this.app.wss = this.wss
 
     this.onConnection()
   }
@@ -13,6 +12,7 @@ class Sockets {
   onConnection () {
     const app = this.app
     this.wss.on('connection', (ws) => {
+      console.log('Connection stated')
       // connection is up, let's add a simple simple event
       ws.on('message', (message) => {
         try {
@@ -28,7 +28,8 @@ class Sockets {
   }
 
   onClientConnected (ws) {
-    const app = this.app
+    // const app = this.app
+    console.log('Client connected')
   }
 
   broadcast (message) {
