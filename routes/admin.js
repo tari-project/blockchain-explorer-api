@@ -9,12 +9,14 @@ const {
   syncDifficulties
 } = require('../helpers/sync')
 
-router.post('/proto', simpleAuth, async (req, res) => {
+router.use(simpleAuth)
+
+router.post('/proto', async (req, res) => {
   const result = await baseNode._checkVersion(req.query.update)
   return res.json(result)
 })
 
-router.post('/flush', simpleAuth, async (req, res) => {
+router.post('/flush', async (req, res) => {
   await redis.flushall()
   return res.status(202).json({
     status: 'OK',
@@ -22,10 +24,10 @@ router.post('/flush', simpleAuth, async (req, res) => {
   })
 })
 
-router.post('/sync', simpleAuth, async (req, res) => {
+router.post('/sync', async (req, res) => {
   const { type = 'all' } = req.query
   if (type === 'all' || type === 'blocks') {
-    syncBlocks()
+    syncBlocks(req.app._sockets)
   }
   if (type === 'all' || type === 'difficulties') {
     syncDifficulties()
@@ -42,7 +44,7 @@ router.post('/sync', simpleAuth, async (req, res) => {
   })
 })
 
-router.get('/status', simpleAuth, async (req, res) => {
+router.get('/status', async (req, res) => {
   const grpc = {
     status: false,
     message: null

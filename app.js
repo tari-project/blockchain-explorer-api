@@ -3,11 +3,6 @@ const path = require('path')
 const express = require('express')
 const logger = require('morgan')
 const cors = require('cors')
-const cron = require('./helpers/cron')
-const { noCron } = require('./config')
-if (!noCron) {
-  cron.schedule()
-}
 
 const app = express()
 

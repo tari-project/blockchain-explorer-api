@@ -2,7 +2,7 @@ const cron = require('node-cron')
 const sync = require('./sync')
 const options = { scheduled: true }
 
-const schedule = () => {
+const schedule = (sockets) => {
   console.debug('Starting scheduled sync')
   // Sync constants only needs to happen on load
   console.log('Syncing Constants')
@@ -12,7 +12,7 @@ const schedule = () => {
   console.log('Starting Cron', 'Sync Blocks and Headers')
   // Check every 2 minutes for new blocks and headers
   cron.schedule('*/2 * * * *', () => {
-    sync.syncBlocks().catch(e => {
+    sync.syncBlocks(sockets).catch(e => {
       console.error('Sync Blocks Error', e)
     })
     sync.syncDifficulties().catch(e => {

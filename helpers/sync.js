@@ -13,13 +13,16 @@ const CHUNK_SIZE = 1000
 
 const REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT = 'current_block_height'
 const REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT = 'current_difficulty_height'
-
 const REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP = 'transactions_by_time'
 const REDIS_STORE_KEY_TRANSACTIONS_TOTAL = 'transactions_total'
 const REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT = 'difficulties_by_height'
 const REDIS_STORE_KEY_BLOCKS_BY_HEIGHT = 'blocks_by_height'
 const REDIS_STORE_KEY_BLOCKS_BY_TIME = 'blocks_by_time'
 const REDIS_STORE_KEY_CONSTANTS = 'constants'
+
+// Don't spam the websocket clients on initial sync
+const WS_DEBOUNCE_TIMEOUT = 90 * 1000
+let webSocketDebounce = 0
 
 const difficultyHeight = async () => {
   return +(await redis.get(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT) || 0)
@@ -148,7 +151,7 @@ const syncDifficulties = async () => {
   }
 }
 
-const syncBlocks = async () => {
+const syncBlocks = async (sockets) => {
   if (LOCKS.blocks) {
     console.log('syncBlocks locked')
     return
@@ -166,13 +169,28 @@ const syncBlocks = async () => {
 
       console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainTip)
       const blocks = await protos.baseNode.GetBlocks(heights)
-
+      blocks.sort((a, b) => +a.block.header.timestamp.seconds - +b.block.header.timestamp.seconds)
       for (const i in blocks) {
         const blockData = blocks[i]
         const { block: { header: { height, timestamp: { seconds } } } } = blockData
         const blockHeight = +height
-        const blockDataString = JSON.stringify(blockData)
         const milliseconds = +seconds * 1000
+        // Pull the previous block to calculate the _miningTime
+        let miningTime = 0
+        if (blockHeight > 0) {
+          let prevBlock
+          if (i > 0) {
+            prevBlock = blocks[i - 1]
+          } else {
+            prevBlock = (await getBlocks(blockHeight - 1, blockHeight - 1)).pop()
+          }
+
+          const prevBlockSeconds = +prevBlock.block.header.timestamp.seconds
+          miningTime = +seconds - prevBlockSeconds
+        }
+        blockData.block._miningTime = miningTime
+
+        const blockDataString = JSON.stringify(blockData)
         await redis.zremrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockHeight)
         await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
         await redis.zremrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_TIME, blockHeight, blockHeight)
@@ -180,6 +198,11 @@ const syncBlocks = async () => {
         await setTransactionsCount(blockData)
         if (blockHeight > currentBlockHeight) {
           currentBlockHeight = blockHeight
+          const now = (new Date()).getTime()
+          if (now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
+            webSocketDebounce = now
+            sockets.broadcast({ type: 'newBlock', data: blockData })
+          }
         }
       }
       await redis.set(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT, currentBlockHeight)

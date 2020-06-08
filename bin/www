@@ -7,7 +7,11 @@
 const app = require('../app')
 const debug = require('debug')('blockchain-explorer-api:server')
 const http = require('http')
+const Sockets = require('../helpers/sockets')
 const { port: listenPort } = require('../config')
+const cron = require('../helpers/cron')
+const { noCron } = require('../config')
+
 /**
  * Get port from environment and store in Express.
  */
@@ -20,7 +24,12 @@ app.set('port', port)
  */
 
 const server = http.createServer(app)
-
+// eslint-disable-next-line no-unused-vars
+const sockets = new Sockets(server, app)
+app._sockets = sockets
+if (!noCron) {
+  cron.schedule(sockets)
+}
 /**
  * Listen on provided port, on all network interfaces.
  */
