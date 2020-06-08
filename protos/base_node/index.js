@@ -11,10 +11,6 @@ const defaultHeightOrBlockGroupRequest = {
   end_height: 0
 }
 
-const defaultIntegerValue = {
-  value: 0
-}
-
 module.exports = (client) => {
   return {
     _onError: async function (e, reject) {
