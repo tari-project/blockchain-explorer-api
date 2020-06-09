@@ -98,6 +98,9 @@ const getTransactions = async (from, to = '+inf') => {
   return formattedMembers
 }
 
+const getTotalTransactions = async () => {
+  return +(await redis.get(REDIS_STORE_KEYS.TRANSACTIONS_TOTAL))
+}
 module.exports = {
   getBlockHeight,
   getChainMetadata,
@@ -106,5 +109,6 @@ module.exports = {
   getTransactions,
   getChainRunningTime,
   getDifficulties,
+  getTotalTransactions,
   REDIS_STORE_KEYS
 }

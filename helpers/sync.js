@@ -19,10 +19,6 @@ const difficultyHeight = async () => {
   return +(await redis.get(REDIS_STORE_KEYS.DIFFICULTY_CURRENT_HEIGHT) || 0)
 }
 
-const getTotalTransactions = async () => {
-  return +(await redis.get(REDIS_STORE_KEYS.TRANSACTIONS_TOTAL))
-}
-
 const setTransactionsCount = async (blockData) => {
   const {
     block: {
@@ -182,7 +178,6 @@ const syncConstants = async () => {
 }
 
 module.exports = {
-  getTotalTransactions,
   syncBlocks,
   syncDifficulties,
   syncConstants,
