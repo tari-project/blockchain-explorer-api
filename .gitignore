@@ -1,5 +1,6 @@
 _data
 .env
+.env.docker.frontend
 # Logs
 logs
 # Node
