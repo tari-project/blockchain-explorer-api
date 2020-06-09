@@ -12,14 +12,14 @@ const getChainMetadata = async (startMs, blocksFromTip) => {
   const averageFee = totalFees / totalTransactions
 
   let transactionTimes = 0
-  let avgBlockTimes = 0
+  let averageBlockTimes = 0
   if (transactions.length > 2) {
     transactions.forEach((t, i) => {
       if (transactions.length > i + 1) {
         transactionTimes += transactions[i + 1].timestamp - t.timestamp
       }
     })
-    avgBlockTimes = Math.trunc((transactionTimes / (transactions.length - 1)) / 1000)
+    averageBlockTimes = Math.trunc((transactionTimes / (transactions.length - 1)) / 1000)
   }
   const averageDifficulty = {
     difficulty: 0,
@@ -33,6 +33,7 @@ const getChainMetadata = async (startMs, blocksFromTip) => {
     averageDifficulty.difficulty = averageDifficulty.difficulty / difficulties.length
     averageDifficulty.estimatedHashRate = averageDifficulty.estimatedHashRate / difficulties.length
   }
+  const averageTxPerSecond = totalTransactions / ((now - startMs) / 1000)
 
   return {
     startMs,
@@ -42,7 +43,8 @@ const getChainMetadata = async (startMs, blocksFromTip) => {
     chainRunningTime,
     averageDifficulty,
     averageFee,
-    avgBlockTimes
+    averageBlockTimes,
+    averageTxPerSecond
   }
 }
 
