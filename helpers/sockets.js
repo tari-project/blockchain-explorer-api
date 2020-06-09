@@ -10,9 +10,8 @@ class Sockets {
 
   onConnection () {
     const app = this.app
-    this.wss.on('connection', (ws) => {
-      console.log('Connection stated')
-      // connection is up, let's add a simple simple event
+    this.wss.on('connection', (ws, req) => {
+      console.log('Connection started', req.connection.remoteAddress)
       ws.on('message', (message) => {
         try {
           const command = JSON.parse(message)

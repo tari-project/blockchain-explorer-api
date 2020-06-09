@@ -5,7 +5,7 @@ const getChainMetadata = async (startMs, blocksFromTip) => {
   const now = (new Date()).getTime()
   startMs = startMs || now - (24 * 60 * 60 * 1000)
   blocksFromTip = blocksFromTip || Math.abs((now - startMs) / 1000 / config.blockTimeSeconds)
-  const [chainTip, transactions, chainRunningTime, difficulties] = await Promise.all([getBlockHeight(), getTransactions(startMs), getChainRunningTime(), getDifficulties(blocksFromTip * -1)])
+  const [blockHeight, transactions, chainRunningTime, difficulties] = await Promise.all([getBlockHeight(), getTransactions(startMs), getChainRunningTime(), getDifficulties(blocksFromTip * -1)])
 
   const totalTransactions = transactions.reduce((acc, b) => acc + b.transactions, 0)
   const totalFees = transactions.reduce((acc, b) => acc + b.fee, 0)
@@ -38,7 +38,7 @@ const getChainMetadata = async (startMs, blocksFromTip) => {
   return {
     startMs,
     blocksFromTip,
-    blockHeight: chainTip,
+    blockHeight,
     totalTransactions,
     chainRunningTime,
     averageDifficulty,
