@@ -3,7 +3,6 @@ const router = express.Router()
 
 const { rangeInclusive } = require('../helpers/array')
 const { redisPageRange } = require('../helpers/paging')
-const config = require('../config')
 const {
   getBlockHeight,
   getChainMetadata,
