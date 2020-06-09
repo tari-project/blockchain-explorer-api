@@ -3,6 +3,7 @@ const { range } = require('./array')
 const protos = require('../protos')
 const sleep = require('./sleep')
 const { getBlocks, getChainMetadata, getBlockHeight } = require('../models/base_node')
+const { broadcastDebounceSeconds } = require('../config')
 const LOCKS = {
   blocks: false,
   difficulties: false,
@@ -12,7 +13,7 @@ const LOCKS = {
 const CHUNK_SIZE = 1000
 
 // Don't spam the websocket clients on initial sync
-const WS_DEBOUNCE_TIMEOUT = 90 * 1000
+const WS_DEBOUNCE_TIMEOUT = broadcastDebounceSeconds * 1000
 let webSocketDebounce = 0
 
 const difficultyHeight = async () => {

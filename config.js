@@ -5,6 +5,7 @@ const config = {
   adminToken: process.env.ADMIN_TOKEN,
   grpcUrl: process.env.GRPC_URL,
   protoRemoteUrl: process.env.PROTO_REMOTE_URL,
-  blockTimeSeconds: process.env.BLOCK_TIME_SECONDS || 120
+  blockTimeSeconds: process.env.BLOCK_TIME_SECONDS || 120,
+  broadcastDebounceSeconds: process.env.BROADCAST_BLOCK_DEBOUNCE_SECONDS || 30
 }
 module.exports = config
