@@ -1,8 +1,8 @@
-const redis = require('./redis')
+const { client: redis, REDIS_STORE_KEYS } = require('./redis')
 const { range } = require('./array')
 const protos = require('../protos')
 const sleep = require('./sleep')
-
+const { getBlocks, getChainMetadata, getBlockHeight } = require('../models/base_node')
 const LOCKS = {
   blocks: false,
   difficulties: false,
@@ -11,76 +11,16 @@ const LOCKS = {
 
 const CHUNK_SIZE = 1000
 
-const REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT = 'current_block_height'
-const REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT = 'current_difficulty_height'
-const REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP = 'transactions_by_time'
-const REDIS_STORE_KEY_TRANSACTIONS_TOTAL = 'transactions_total'
-const REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT = 'difficulties_by_height'
-const REDIS_STORE_KEY_BLOCKS_BY_HEIGHT = 'blocks_by_height'
-const REDIS_STORE_KEY_BLOCKS_BY_TIME = 'blocks_by_time'
-const REDIS_STORE_KEY_CONSTANTS = 'constants'
-
 // Don't spam the websocket clients on initial sync
 const WS_DEBOUNCE_TIMEOUT = 90 * 1000
 let webSocketDebounce = 0
 
 const difficultyHeight = async () => {
-  return +(await redis.get(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT) || 0)
-}
-
-const blockHeight = async () => {
-  return +(await redis.get(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT) || 0)
-}
-
-const getConstants = async () => {
-  const constantsString = await redis.get(REDIS_STORE_KEY_CONSTANTS)
-  if (!constantsString) {
-    return await syncConstants()
-  }
-  return JSON.parse(constantsString)
-}
-const getTransactions = async (from, to = '+inf') => {
-  const members = await redis.zrangebyscore(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, from, to)
-  const formattedMembers = members.map(m => {
-    const [height, timestamp, transactions, fee] = m.split(':')
-    return {
-      height: +height,
-      timestamp: +timestamp,
-      transactions: +transactions,
-      fee: +fee
-    }
-  })
-  return formattedMembers
-}
-
-const getDifficulties = async (from, to = '+inf') => {
-  const members = await redis.zrangebyscore(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, from, to)
-  return members.map(m => {
-    const [height, difficulty, estimatedHashRate] = m.split(':').map(n => +n)
-    return {
-      height, difficulty, estimatedHashRate
-    }
-  })
-}
-
-const getBlocks = async (from, to) => {
-  return (await redis.zrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, from, to)).map(JSON.parse)
-}
-
-const getChainRunningTime = async () => {
-  const last = await redis.zrange(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, -1, -1, 'withscores')
-  const first = await redis.zrange(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, 0, 0, 'withscores')
-  const start = +first.pop()
-  const end = +last.pop()
-  return {
-    start,
-    end,
-    runningTimeMillis: end - start
-  }
+  return +(await redis.get(REDIS_STORE_KEYS.DIFFICULTY_CURRENT_HEIGHT) || 0)
 }
 
 const getTotalTransactions = async () => {
-  return +(await redis.get(REDIS_STORE_KEY_TRANSACTIONS_TOTAL))
+  return +(await redis.get(REDIS_STORE_KEYS.TRANSACTIONS_TOTAL))
 }
 
 const setTransactionsCount = async (blockData) => {
@@ -94,9 +34,9 @@ const setTransactionsCount = async (blockData) => {
   const totalFee = kernels.map(k => +k.fee).reduce((acc, b) => acc + b, 0)
   const timestamp = +seconds * 1000
   const member = [height, timestamp, transactions, totalFee].join(':')
-  await redis.zremrangebyscore(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, timestamp, timestamp)
-  await redis.zadd(REDIS_STORE_KEY_TRANSACTIONS_BY_TIMESTAMP, timestamp, member)
-  await redis.incrby(REDIS_STORE_KEY_TRANSACTIONS_TOTAL, transactions)
+  await redis.zremrangebyscore(REDIS_STORE_KEYS.TRANSACTIONS_BY_TIMESTAMP, timestamp, timestamp)
+  await redis.zadd(REDIS_STORE_KEYS.TRANSACTIONS_BY_TIMESTAMP, timestamp, member)
+  await redis.incrby(REDIS_STORE_KEYS.TRANSACTIONS_TOTAL, transactions)
 }
 
 const syncDifficulties = async () => {
@@ -132,14 +72,14 @@ const syncDifficulties = async () => {
         const blockHeight = +height
         const member = [blockHeight, difficulty, estimatedHashRate].join(':')
 
-        await redis.zremrangebyscore(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, blockHeight, blockHeight)
-        await redis.zadd(REDIS_STORE_KEY_DIFFICULTIES_BY_HEIGHT, blockHeight, member)
+        await redis.zremrangebyscore(REDIS_STORE_KEYS.DIFFICULTIES_BY_HEIGHT, blockHeight, blockHeight)
+        await redis.zadd(REDIS_STORE_KEYS.DIFFICULTIES_BY_HEIGHT, blockHeight, member)
         if (blockHeight > currentBlockHeight) {
           currentBlockHeight = blockHeight
         }
       }
 
-      await redis.set(REDIS_STORE_KEY_DIFFICULTY_CURRENT_HEIGHT, currentBlockHeight)
+      await redis.set(REDIS_STORE_KEYS.DIFFICULTY_CURRENT_HEIGHT, currentBlockHeight)
       console.debug('Setting new difficulty height', currentBlockHeight)
       await sleep(1000)
       currentCacheDifficultyHeight = currentBlockHeight
@@ -158,11 +98,12 @@ const syncBlocks = async (sockets) => {
   }
   LOCKS.blocks = true
   try {
-    let currentCacheBlockHeight = await blockHeight()
+    let currentCacheBlockHeight = await getBlockHeight()
     // Get the tip
     const currentChainTip = await protos.baseNode.GetChainTip()
     console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
     let currentBlockHeight = currentCacheBlockHeight
+    let broadcastBlock
     while (currentCacheBlockHeight < currentChainTip) {
       // Fetch all the blocks for the range
       const heights = range(currentCacheBlockHeight, Math.min(CHUNK_SIZE, currentChainTip - currentCacheBlockHeight) + 1, true)
@@ -191,22 +132,25 @@ const syncBlocks = async (sockets) => {
         blockData.block._miningTime = miningTime
 
         const blockDataString = JSON.stringify(blockData)
-        await redis.zremrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockHeight)
-        await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
-        await redis.zremrangebyscore(REDIS_STORE_KEY_BLOCKS_BY_TIME, blockHeight, blockHeight)
-        await redis.zadd(REDIS_STORE_KEY_BLOCKS_BY_TIME, milliseconds, blockDataString)
+        await redis.zremrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, blockHeight)
+        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
+        await redis.zremrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_TIME, blockHeight, blockHeight)
+        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, blockDataString)
         await setTransactionsCount(blockData)
+
         if (blockHeight > currentBlockHeight) {
+          broadcastBlock = blockData
           currentBlockHeight = blockHeight
-          const now = (new Date()).getTime()
-          if (now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
-            webSocketDebounce = now
-            sockets.broadcast({ type: 'newBlock', data: blockData })
-          }
         }
       }
-      await redis.set(REDIS_STORE_KEY_BLOCK_CURRENT_HEIGHT, currentBlockHeight)
+      await redis.set(REDIS_STORE_KEYS.BLOCK_CURRENT_HEIGHT, currentBlockHeight)
       console.debug('Setting new block height', currentBlockHeight)
+      const now = (new Date()).getTime()
+      if (broadcastBlock && now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
+        webSocketDebounce = now
+        sockets.broadcast({ type: 'newBlock', data: broadcastBlock })
+        sockets.broadcast({ type: 'metadata', data: await getChainMetadata() })
+      }
       await sleep(1000)
       currentCacheBlockHeight = currentBlockHeight
     }
@@ -227,7 +171,7 @@ const syncConstants = async () => {
   try {
     console.debug('Setting constants')
     constants = await protos.baseNode.GetConstants()
-    await redis.set(REDIS_STORE_KEY_CONSTANTS, JSON.stringify(constants))
+    await redis.set(REDIS_STORE_KEYS.CONSTANTS, JSON.stringify(constants))
   } catch (e) {
     console.error('Error syncConstants', e)
   } finally {
@@ -238,13 +182,7 @@ const syncConstants = async () => {
 }
 
 module.exports = {
-  blockHeight,
-  getConstants,
-  getBlocks,
-  getTransactions,
   getTotalTransactions,
-  getChainRunningTime,
-  getDifficulties,
   syncBlocks,
   syncDifficulties,
   syncConstants,

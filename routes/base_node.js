@@ -3,60 +3,20 @@ const router = express.Router()
 
 const { rangeInclusive } = require('../helpers/array')
 const { redisPageRange } = require('../helpers/paging')
+const config = require('../config')
 const {
-  blockHeight,
-  getBlocks,
+  getBlockHeight,
+  getChainMetadata,
   getConstants,
-  getTransactions,
-  getChainRunningTime,
-  getDifficulties
-} = require('../helpers/sync')
+  getBlocks,
+  getTransactions
+} = require('../models/base_node')
 const { baseNode } = require('../protos')
 
 router.get('/chain-metadata', async (req, res) => {
   try {
-    const now = (new Date()).getTime()
-    const { start: startMs = now - (24 * 60 * 60 * 1000) } = req.query
-    const blocksFromTip = Math.abs((now - startMs) / 1000 / 120)
-    const [chainTip, transactions, chainRunningTime, difficulties] = await Promise.all([blockHeight(), getTransactions(startMs), getChainRunningTime(), getDifficulties(blocksFromTip * -1)])
-
-    const totalTransactions = transactions.reduce((acc, b) => acc + b.transactions, 0)
-    const totalFees = transactions.reduce((acc, b) => acc + b.fee, 0)
-    const averageFee = totalFees / totalTransactions
-
-    let transactionTimes = 0
-    let avgBlockTimes = 0
-    if (transactions.length > 2) {
-      transactions.forEach((t, i) => {
-        if (transactions.length > i + 1) {
-          transactionTimes += transactions[i + 1].timestamp - t.timestamp
-        }
-      })
-      avgBlockTimes = Math.trunc((transactionTimes / (transactions.length - 1)) / 1000)
-    }
-    const averageDifficulty = {
-      difficulty: 0,
-      estimatedHashRate: 0
-    }
-    if (difficulties.length > 0) {
-      difficulties.forEach(d => {
-        averageDifficulty.difficulty += d.difficulty
-        averageDifficulty.estimatedHashRate += d.estimatedHashRate
-      })
-      averageDifficulty.difficulty = averageDifficulty.difficulty / difficulties.length
-      averageDifficulty.estimatedHashRate = averageDifficulty.estimatedHashRate / difficulties.length
-    }
-
-    return res.json({
-      startMs,
-      blocksFromTip,
-      blockHeight: chainTip,
-      totalTransactions,
-      chainRunningTime,
-      averageDifficulty,
-      averageFee,
-      avgBlockTimes
-    })
+    const metadata = await getChainMetadata(req.query.start)
+    return res.json(metadata)
   } catch (e) {
     return res.sendStatus(500).json(e)
   }
@@ -64,7 +24,7 @@ router.get('/chain-metadata', async (req, res) => {
 
 router.get('/blocks', async (req, res, next) => {
   try {
-    const chainTip = await blockHeight()
+    const chainTip = await getBlockHeight()
     const { getRange, paging } = redisPageRange(req.query, chainTip, '')
     const start = Math.min(...getRange)
     const end = Math.max(...getRange)
@@ -78,7 +38,7 @@ router.get('/blocks', async (req, res, next) => {
 
 router.get('/headers', async (req, res, next) => {
   try {
-    const chainTip = await blockHeight()
+    const chainTip = await getBlockHeight()
     const { getRange, paging } = redisPageRange(req.query, chainTip, '')
     const start = Math.min(...getRange)
     const end = Math.max(...getRange)
@@ -158,7 +118,7 @@ router.get('/version', async (_, res) => {
 
 router.get('/tokens-in-circulation', async (req, res) => {
   try {
-    const chainTip = await blockHeight()
+    const chainTip = await getBlockHeight()
 
     const start = +(req.query.start || 0)
     const end = +(req.query.end || start)
