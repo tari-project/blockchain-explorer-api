@@ -11,7 +11,8 @@ class Sockets {
   onConnection () {
     const app = this.app
     this.wss.on('connection', (ws, req) => {
-      console.log('Connection started', req.connection.remoteAddress)
+      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress
+      console.log('Connection started', ip)
       ws.on('message', (message) => {
         try {
           const command = JSON.parse(message)
