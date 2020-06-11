@@ -74,8 +74,17 @@ const getBlockHeight = async () => {
   return +(await redis.get(REDIS_STORE_KEYS.BLOCK_CURRENT_HEIGHT) || 0)
 }
 
-const getBlocks = async (from, to) => {
-  return (await redis.zrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, from, to)).map(JSON.parse)
+const getBlocksByHeight = async (from, to) => {
+  const blockHashes = await redis.zrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, from, to)
+  return await getBlocksByHashes(blockHashes)
+}
+
+const getBlocksByHashes = async (hashes = []) => {
+  if (hashes.length > 0) {
+    const blocks = await redis.hmget(REDIS_STORE_KEYS.BLOCKS_BY_HASH, ...hashes.map(hash => hash))
+    return blocks.map(JSON.parse)
+  }
+  return []
 }
 
 const getConstants = async () => {
@@ -106,7 +115,8 @@ const getTotalTransactions = async () => {
 module.exports = {
   getBlockHeight,
   getChainMetadata,
-  getBlocks,
+  getBlocksByHeight,
+  getBlocksByHashes,
   getConstants,
   getTransactions,
   getChainRunningTime,

@@ -12,6 +12,9 @@ const client = {
   incrby: promisify(syncClient.incrby).bind(syncClient),
   mget: promisify(syncClient.mget).bind(syncClient),
   set: promisify(syncClient.set).bind(syncClient),
+  hset: promisify(syncClient.hset).bind(syncClient),
+  hget: promisify(syncClient.hget).bind(syncClient),
+  hmget: promisify(syncClient.hmget).bind(syncClient),
   zadd: promisify(syncClient.zadd).bind(syncClient),
   zrangebyscore: promisify(syncClient.zrangebyscore).bind(syncClient),
   zremrangebyscore: promisify(syncClient.zremrangebyscore).bind(syncClient),
@@ -26,6 +29,7 @@ const REDIS_STORE_KEYS = {
   DIFFICULTIES_BY_HEIGHT: 'difficulties_by_height',
   BLOCKS_BY_HEIGHT: 'blocks_by_height',
   BLOCKS_BY_TIME: 'blocks_by_time',
+  BLOCKS_BY_HASH: 'blocks_by_hash',
   CONSTANTS: 'constants'
 }
 module.exports = { client, REDIS_STORE_KEYS }

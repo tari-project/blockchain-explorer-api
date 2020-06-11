@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const redis = require('../helpers/redis')
+const { client: redis } = require('../helpers/redis')
 const { simpleAuth } = require('../middleware/auth')
 const { baseNode } = require('../protos')
 const {
