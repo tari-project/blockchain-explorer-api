@@ -108,44 +108,12 @@ const syncBlocks = async (sockets) => {
 
       console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainTip)
       const blocks = await protos.baseNode.GetBlocks(heights)
-      blocks.sort((a, b) => +a.block.header.timestamp.seconds - +b.block.header.timestamp.seconds)
-      for (const i in blocks) {
-        const blockData = blocks[i]
-        const { block: { body: { inputs, outputs, kernels }, header: { hash, height, timestamp: { seconds } } } } = blockData
-        const blockHeight = +height
-        const milliseconds = +seconds * 1000
-        // Pull the previous block to calculate the _miningTime
-        let miningTime = 0
-        if (blockHeight > 0) {
-          let prevBlock
-          if (i > 0) {
-            prevBlock = blocks[i - 1]
-          } else {
-            prevBlock = (await getBlocksByHeight(blockHeight - 1, blockHeight - 1)).pop()
-          }
-
-          const prevBlockSeconds = +prevBlock.block.header.timestamp.seconds
-          miningTime = +seconds - prevBlockSeconds
-        }
-        blockData.block._miningTime = miningTime
-
-        const weight = (inputs.length * +constants.block_weight_inputs) + (outputs.length * +constants.block_weight_outputs) + (kernels.length * +constants.block_weight_kernels)
-        blockData.block._weight = weight
-        blockData.block._filledPercent = weight / +constants.max_block_transaction_weight
-
-        const blockDataString = JSON.stringify(blockData)
-        await redis.hset(REDIS_STORE_KEYS.BLOCKS_BY_HASH, hash, blockDataString)
-        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, hash)
-        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, hash)
-        await setTransactionsCount(blockData)
-
-        if (blockHeight > currentBlockHeight) {
-          broadcastBlock = blockData
-          currentBlockHeight = blockHeight
-        }
-      }
+      const { tmpCurrentBlockHeight, tmpBroadcastBlock } = await _processBlocks(blocks, currentBlockHeight, constants)
+      currentBlockHeight = tmpCurrentBlockHeight
+      broadcastBlock = tmpBroadcastBlock
       await redis.set(REDIS_STORE_KEYS.BLOCK_CURRENT_HEIGHT, currentBlockHeight)
       console.debug('Setting new block height', currentBlockHeight)
+      // Broadcast the latest block to all the websocket clients
       const now = (new Date()).getTime()
       if (broadcastBlock && now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
         webSocketDebounce = now
@@ -165,6 +133,60 @@ const syncBlocks = async (sockets) => {
     console.error('Error syncBlocks', e)
   } finally {
     LOCKS.blocks = false
+  }
+}
+
+/**
+ * Calculates the mining time / weight / filledPercent of the block
+ * Stores the block in redis
+ * Returns the latest block height and broadcast block
+ * @param blocks
+ * @param currentBlockHeight
+ * @param constants
+ * @returns {Promise<{tmpCurrentBlockHeight: *, tmpBroadcastBlock: *}>}
+ * @private
+ */
+const _processBlocks = async (blocks, currentBlockHeight, constants) => {
+  blocks.sort((a, b) => +a.block.header.timestamp.seconds - +b.block.header.timestamp.seconds)
+  let tmpBroadcastBlock
+  for (const i in blocks) {
+    const blockData = blocks[i]
+    const { block: { body: { inputs, outputs, kernels }, header: { hash, height, timestamp: { seconds } } } } = blockData
+    const blockHeight = +height
+    const milliseconds = +seconds * 1000
+    // Pull the previous block to calculate the _miningTime
+    let miningTime = 0
+    if (blockHeight > 0) {
+      let prevBlock
+      if (i > 0) {
+        prevBlock = blocks[i - 1]
+      } else {
+        prevBlock = (await getBlocksByHeight(blockHeight - 1, blockHeight - 1)).pop()
+      }
+
+      const prevBlockSeconds = +prevBlock.block.header.timestamp.seconds
+      miningTime = +seconds - prevBlockSeconds
+    }
+    blockData.block._miningTime = miningTime
+
+    const weight = (inputs.length * +constants.block_weight_inputs) + (outputs.length * +constants.block_weight_outputs) + (kernels.length * +constants.block_weight_kernels)
+    blockData.block._weight = weight
+    blockData.block._filledPercent = weight / +constants.max_block_transaction_weight
+
+    const blockDataString = JSON.stringify(blockData)
+    await redis.hset(REDIS_STORE_KEYS.BLOCKS_BY_HASH, hash, blockDataString)
+    await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, hash)
+    await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, hash)
+    await setTransactionsCount(blockData)
+
+    if (blockHeight > currentBlockHeight) {
+      tmpBroadcastBlock = blockData
+      currentBlockHeight = blockHeight
+    }
+  }
+  return {
+    tmpBroadcastBlock,
+    tmpCurrentBlockHeight: currentBlockHeight
   }
 }
 
