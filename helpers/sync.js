@@ -2,7 +2,7 @@ const { client: redis, REDIS_STORE_KEYS } = require('./redis')
 const { range } = require('./array')
 const protos = require('../protos')
 const sleep = require('./sleep')
-const { getBlocksByHeight, getChainMetadata, getBlockHeight } = require('../models/base_node')
+const { getBlocksByHeight, getChainMetadata, getBlockHeight, getConstants } = require('../models/base_node')
 const { broadcastDebounceSeconds } = require('../config')
 const LOCKS = {
   blocks: false,
@@ -96,6 +96,7 @@ const syncBlocks = async (sockets) => {
   LOCKS.blocks = true
   try {
     let currentCacheBlockHeight = await getBlockHeight()
+    const constants = await getConstants()
     // Get the tip
     const currentChainTip = await protos.baseNode.GetChainTip()
     console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
@@ -110,7 +111,7 @@ const syncBlocks = async (sockets) => {
       blocks.sort((a, b) => +a.block.header.timestamp.seconds - +b.block.header.timestamp.seconds)
       for (const i in blocks) {
         const blockData = blocks[i]
-        const { block: { header: { hash, height, timestamp: { seconds } } } } = blockData
+        const { block: { body: { inputs, outputs, kernels }, header: { hash, height, timestamp: { seconds } } } } = blockData
         const blockHeight = +height
         const milliseconds = +seconds * 1000
         // Pull the previous block to calculate the _miningTime
@@ -128,6 +129,10 @@ const syncBlocks = async (sockets) => {
         }
         blockData.block._miningTime = miningTime
 
+        const weight = (inputs.length * +constants.block_weight_inputs) + (outputs.length * +constants.block_weight_outputs) + (kernels.length * +constants.block_weight_kernels)
+        blockData.block._weight = weight
+        blockData.block._filledPercent = weight / +constants.max_block_transaction_weight
+
         const blockDataString = JSON.stringify(blockData)
         await redis.hset(REDIS_STORE_KEYS.BLOCKS_BY_HASH, hash, blockDataString)
         await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, hash)
@@ -144,8 +149,14 @@ const syncBlocks = async (sockets) => {
       const now = (new Date()).getTime()
       if (broadcastBlock && now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
         webSocketDebounce = now
-        sockets.broadcast({ type: 'newBlock', data: broadcastBlock })
-        sockets.broadcast({ type: 'metadata', data: await getChainMetadata() })
+        sockets.broadcast({
+          type: 'newBlock',
+          data: broadcastBlock
+        })
+        sockets.broadcast({
+          type: 'metadata',
+          data: await getChainMetadata()
+        })
       }
       await sleep(1000)
       currentCacheBlockHeight = currentBlockHeight
@@ -165,7 +176,7 @@ const syncConstants = async () => {
   LOCKS.constants = true
   let constants = {}
   try {
-    console.debug('Setting constants')
+    console.debug('Syncing constants')
     constants = await protos.baseNode.GetConstants()
     await redis.set(REDIS_STORE_KEYS.CONSTANTS, JSON.stringify(constants))
   } catch (e) {
