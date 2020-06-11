@@ -2,7 +2,7 @@ const { client: redis, REDIS_STORE_KEYS } = require('./redis')
 const { range } = require('./array')
 const protos = require('../protos')
 const sleep = require('./sleep')
-const { getBlocks, getChainMetadata, getBlockHeight } = require('../models/base_node')
+const { getBlocksByHeight, getChainMetadata, getBlockHeight } = require('../models/base_node')
 const { broadcastDebounceSeconds } = require('../config')
 const LOCKS = {
   blocks: false,
@@ -110,7 +110,7 @@ const syncBlocks = async (sockets) => {
       blocks.sort((a, b) => +a.block.header.timestamp.seconds - +b.block.header.timestamp.seconds)
       for (const i in blocks) {
         const blockData = blocks[i]
-        const { block: { header: { height, timestamp: { seconds } } } } = blockData
+        const { block: { header: { hash, height, timestamp: { seconds } } } } = blockData
         const blockHeight = +height
         const milliseconds = +seconds * 1000
         // Pull the previous block to calculate the _miningTime
@@ -120,7 +120,7 @@ const syncBlocks = async (sockets) => {
           if (i > 0) {
             prevBlock = blocks[i - 1]
           } else {
-            prevBlock = (await getBlocks(blockHeight - 1, blockHeight - 1)).pop()
+            prevBlock = (await getBlocksByHeight(blockHeight - 1, blockHeight - 1)).pop()
           }
 
           const prevBlockSeconds = +prevBlock.block.header.timestamp.seconds
@@ -129,10 +129,9 @@ const syncBlocks = async (sockets) => {
         blockData.block._miningTime = miningTime
 
         const blockDataString = JSON.stringify(blockData)
-        await redis.zremrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, blockHeight)
-        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, blockDataString)
-        await redis.zremrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_TIME, blockHeight, blockHeight)
-        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, blockDataString)
+        await redis.hset(REDIS_STORE_KEYS.BLOCKS_BY_HASH, hash, blockDataString)
+        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, hash)
+        await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, hash)
         await setTransactionsCount(blockData)
 
         if (blockHeight > currentBlockHeight) {

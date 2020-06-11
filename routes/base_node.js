@@ -7,8 +7,9 @@ const {
   getBlockHeight,
   getChainMetadata,
   getConstants,
-  getBlocks,
-  getTransactions
+  getBlocksByHeight,
+  getTransactions,
+  getBlocksByHashes
 } = require('../models/base_node')
 const { baseNode } = require('../protos')
 
@@ -21,16 +22,28 @@ router.get('/chain-metadata', async (req, res) => {
   }
 })
 
+router.get('/block/:blockId', async (req, res) => {
+  try {
+    const { blockId } = req.params
+    const block = Number.isInteger(+blockId) ? await getBlocksByHeight(+blockId, +blockId) : await getBlocksByHashes([blockId])
+    return res.json(block.pop())
+  } catch (e) {
+    console.error(e)
+    return res.sendStatus(500).json(e)
+  }
+})
+
 router.get('/blocks', async (req, res, next) => {
   try {
     const chainTip = await getBlockHeight()
     const { getRange, paging } = redisPageRange(req.query, chainTip, '')
     const start = Math.min(...getRange)
     const end = Math.max(...getRange)
-    const blocks = (await getBlocks(start, end))
+    const blocks = (await getBlocksByHeight(start, end))
 
     return res.json({ blocks, paging })
   } catch (e) {
+    console.error(e)
     return res.sendStatus(500).json(e)
   }
 })
@@ -41,7 +54,7 @@ router.get('/headers', async (req, res, next) => {
     const { getRange, paging } = redisPageRange(req.query, chainTip, '')
     const start = Math.min(...getRange)
     const end = Math.max(...getRange)
-    const headers = (await getBlocks(start, end)).map(b => {
+    const headers = (await getBlocksByHeight(start, end)).map(b => {
       const { block: { header } } = b
       return header
     })
