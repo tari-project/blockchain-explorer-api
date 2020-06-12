@@ -26,7 +26,7 @@ router.get('/block/:blockId', async (req, res) => {
   try {
     const { blockId } = req.params
     const block = (Number.isInteger(+blockId) ? await getBlocksByHeight(+blockId, +blockId) : await getBlocksByHashes([blockId])).pop()
-    if (block === null) {
+    if (!block) {
       return res.sendStatus(404)
     }
     return res.json(block)
