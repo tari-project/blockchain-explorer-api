@@ -26,10 +26,14 @@ services:
     image: quay.io/krakaw/tari_base_node:latest
     volumes:
       - "$PWD/_data/tari:/root/.tari"
+      - "$PWD/scripts/docker-fix-config.sh:/usr/bin/docker-fix-config.sh"
     ports:
       - "18142:18142"
     stdin_open: true
     tty: true
+    command:
+      - "/usr/bin/docker-fix-config.sh"
+      - "/usr/bin/start.sh"
   redis:
     image: "redis:alpine"
     ports:
