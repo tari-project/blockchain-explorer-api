@@ -97,11 +97,11 @@ const syncBlocks = async (sockets, overrideBlockHeight) => {
   try {
     // If we override we are re-syncing from a certain point to keep up to date with the chain
     const useOverride = (overrideBlockHeight !== undefined)
-    let currentCacheBlockHeight = useOverride ? overrideBlockHeight : await getBlockHeight()
+    let currentCacheBlockHeight = useOverride ? +overrideBlockHeight : await getBlockHeight()
     const constants = await getConstants()
     // Get the tip
     const currentChainTip = await protos.baseNode.GetChainTip()
-    console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
+    console.debug(useOverride ? `Overriding sync from height: ${overrideBlockHeight}` : '', 'Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
     let currentBlockHeight = currentCacheBlockHeight
     let broadcastBlock
     while (currentCacheBlockHeight < currentChainTip) {
