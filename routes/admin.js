@@ -25,12 +25,12 @@ router.post('/flush', async (req, res) => {
 })
 
 router.post('/sync', async (req, res) => {
-  const { type = 'all' } = req.query
+  const { type = 'all', overrideHeight } = req.query
   if (type === 'all' || type === 'constants') {
     await syncConstants()
   }
   if (type === 'all' || type === 'blocks') {
-    syncBlocks(req.app._sockets)
+    syncBlocks(req.app._sockets, overrideHeight)
   }
   if (type === 'all' || type === 'difficulties') {
     syncDifficulties()

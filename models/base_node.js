@@ -82,7 +82,7 @@ const getBlocksByHeight = async (from, to) => {
 const getBlocksByHashes = async (hashes = []) => {
   if (hashes.length > 0) {
     const blocks = await redis.hmget(REDIS_STORE_KEYS.BLOCKS_BY_HASH, ...hashes.map(hash => hash))
-    return blocks.map(JSON.parse)
+    return blocks.map(JSON.parse).filter(b => b !== null)
   }
   return []
 }

@@ -88,18 +88,20 @@ const syncDifficulties = async () => {
   }
 }
 
-const syncBlocks = async (sockets) => {
+const syncBlocks = async (sockets, overrideBlockHeight) => {
   if (LOCKS.blocks) {
     console.log('syncBlocks locked')
     return
   }
   LOCKS.blocks = true
   try {
-    let currentCacheBlockHeight = await getBlockHeight()
+    // If we override we are re-syncing from a certain point to keep up to date with the chain
+    const useOverride = (overrideBlockHeight !== undefined)
+    let currentCacheBlockHeight = useOverride ? +overrideBlockHeight : await getBlockHeight()
     const constants = await getConstants()
     // Get the tip
     const currentChainTip = await protos.baseNode.GetChainTip()
-    console.debug('Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
+    console.debug(useOverride ? `Overriding sync from height: ${overrideBlockHeight}` : '', 'Syncing Blocks - Cache Height:', currentCacheBlockHeight, 'Chain Height:', currentChainTip)
     let currentBlockHeight = currentCacheBlockHeight
     let broadcastBlock
     while (currentCacheBlockHeight < currentChainTip) {
@@ -108,24 +110,31 @@ const syncBlocks = async (sockets) => {
 
       console.debug('Fetching block heights', Math.min(...heights), ' - ', Math.max(...heights), ' / ', currentChainTip)
       const blocks = await protos.baseNode.GetBlocks(heights)
-      const { tmpCurrentBlockHeight, tmpBroadcastBlock } = await _processBlocks(blocks, currentBlockHeight, constants)
+      const { tmpCurrentBlockHeight, tmpBroadcastBlock } = await _processBlocks(blocks, currentBlockHeight, constants, useOverride)
       currentBlockHeight = tmpCurrentBlockHeight
       broadcastBlock = tmpBroadcastBlock
-      await redis.set(REDIS_STORE_KEYS.BLOCK_CURRENT_HEIGHT, currentBlockHeight)
+      if (!useOverride) {
+        // Only set our cache height for non re-sync operations
+        await redis.set(REDIS_STORE_KEYS.BLOCK_CURRENT_HEIGHT, currentBlockHeight)
+      }
+
       console.debug('Setting new block height', currentBlockHeight)
       // Broadcast the latest block to all the websocket clients
-      const now = (new Date()).getTime()
-      if (broadcastBlock && now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
-        webSocketDebounce = now
-        sockets.broadcast({
-          type: 'newBlock',
-          data: broadcastBlock
-        })
-        sockets.broadcast({
-          type: 'metadata',
-          data: await getChainMetadata()
-        })
+      if (!useOverride) {
+        const now = (new Date()).getTime()
+        if (broadcastBlock && now > webSocketDebounce + WS_DEBOUNCE_TIMEOUT) {
+          webSocketDebounce = now
+          sockets.broadcast({
+            type: 'newBlock',
+            data: broadcastBlock
+          })
+          sockets.broadcast({
+            type: 'metadata',
+            data: await getChainMetadata()
+          })
+        }
       }
+
       await sleep(1000)
       currentCacheBlockHeight = currentBlockHeight
     }
@@ -146,7 +155,7 @@ const syncBlocks = async (sockets) => {
  * @returns {Promise<{tmpCurrentBlockHeight: *, tmpBroadcastBlock: *}>}
  * @private
  */
-const _processBlocks = async (blocks, currentBlockHeight, constants) => {
+const _processBlocks = async (blocks, currentBlockHeight, constants, useOverride) => {
   blocks.sort((a, b) => +a.block.header.timestamp.seconds - +b.block.header.timestamp.seconds)
   let tmpBroadcastBlock
   for (const i in blocks) {
@@ -175,6 +184,10 @@ const _processBlocks = async (blocks, currentBlockHeight, constants) => {
 
     const blockDataString = JSON.stringify(blockData)
     await redis.hset(REDIS_STORE_KEYS.BLOCKS_BY_HASH, hash, blockDataString)
+    if (useOverride) {
+      await redis.zremrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, blockHeight)
+      await redis.zremrangebyscore(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, milliseconds)
+    }
     await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_HEIGHT, blockHeight, hash)
     await redis.zadd(REDIS_STORE_KEYS.BLOCKS_BY_TIME, milliseconds, hash)
     await setTransactionsCount(blockData)
