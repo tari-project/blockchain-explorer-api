@@ -20,4 +20,9 @@ const adminRouter = require('./routes/admin')
 app.use('/', baseNodeRouter)
 app.use('/admin', adminRouter)
 
+// Handles any requests that don't match the ones above
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'))
+})
+
 module.exports = app
