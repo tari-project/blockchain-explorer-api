@@ -9,7 +9,7 @@ services:
     image: quay.io/krakaw/blockchain-explorer-api:latest
     env_file: .env
     ports:
-      - "4000:4000"
+      - "$API_PORT:4000"
     restart: unless-stopped
     volumes:
       - frontend:/app/public
@@ -27,20 +27,20 @@ services:
     volumes:
       - "$PWD/_data/tari:/root/.tari"
       - "$PWD/scripts/docker-fix-config.sh:/usr/bin/docker-fix-config.sh"
-    ports:
-      - "18142:18142"
     stdin_open: true
+    expose:
+      - 18142
     tty: true
     command:
       - "/usr/bin/docker-fix-config.sh"
       - "/usr/bin/start.sh"
   redis:
     image: "redis:alpine"
-    ports:
-      - "6379:6379"
     volumes:
       - "$PWD/_data/redis:/data"
     command: "redis-server --appendonly yes"
+    expose:
+      - 6379
     environment:
       - REDIS_REPLICATION_MODE=master
 volumes:
