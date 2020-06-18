@@ -30,6 +30,8 @@ services:
     stdin_open: true
     expose:
       - 18142
+    ports:
+      - "18142:18142"
     tty: true
     command:
       - "/usr/bin/docker-fix-config.sh"
