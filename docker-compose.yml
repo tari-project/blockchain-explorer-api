@@ -23,7 +23,6 @@ services:
       timeout: 5s
       retries: 3
   tari:
-#    image: quay.io/krakaw/tari_base_node:latest
     build:
       context: .
       dockerfile: basenode.Dockerfile
