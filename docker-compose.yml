@@ -34,11 +34,13 @@ services:
     ports:
       - "18142:18142"
     tty: true
+    restart: unless-stopped
   redis:
     image: "redis:alpine"
     volumes:
       - "$PWD/_data/redis:/data"
     command: "redis-server --appendonly yes"
+    restart: unless-stopped
     expose:
       - 6379
     ports:
