@@ -4,7 +4,7 @@ services:
     image: quay.io/krakaw/block-explorer-frontend:latest
     env_file: .env.docker.frontend
     volumes:
-    - frontend:/app/dist
+      - frontend:/app/dist
   api:
     image: quay.io/krakaw/blockchain-explorer-api:latest
     env_file: .env
@@ -23,19 +23,18 @@ services:
       timeout: 5s
       retries: 3
   tari:
-    image: quay.io/krakaw/tari_base_node:latest
+#    image: quay.io/krakaw/tari_base_node:latest
+    build:
+      context: .
+      dockerfile: basenode.Dockerfile
     volumes:
       - "$PWD/_data/tari:/root/.tari"
-      - "$PWD/scripts/docker-fix-config.sh:/usr/bin/docker-fix-config.sh"
     stdin_open: true
     expose:
       - 18142
     ports:
       - "18142:18142"
     tty: true
-    command:
-      - "/usr/bin/docker-fix-config.sh"
-      - "/usr/bin/start.sh"
   redis:
     image: "redis:alpine"
     volumes:
