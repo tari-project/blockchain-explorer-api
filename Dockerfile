@@ -1,5 +1,5 @@
 FROM node:12-alpine AS builder
-RUN apk add python make gcc g++
+RUN apk add -U python make gcc g++ curl
 WORKDIR /app
 COPY ./package*.json ./
 RUN npm install --production
