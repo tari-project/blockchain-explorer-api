@@ -1,6 +1,6 @@
 const cron = require('node-cron')
 const sync = require('./sync')
-const { cronSyncMinutes } = require('../config')
+const { blockTimeSeconds, cronSyncMinutes } = require('../config')
 const { getBlockHeight } = require('../models/base_node')
 const options = { scheduled: true }
 
@@ -24,8 +24,8 @@ const schedule = (sockets) => {
   // Schedule a re-org sync every day
   cron.schedule('0 7 * * *', () => {
     getBlockHeight().then(height => {
-      //Sync the last 2 days blocks approx
-      const blocksToSync = 2 * 24 * 60 * 60 / config.blockTimeSeconds
+      // Sync the last 2 days blocks approx
+      const blocksToSync = 2 * 24 * 60 * 60 / blockTimeSeconds
       const startingHeight = height - blocksToSync
       sync.syncBlocks(sockets, startingHeight).catch(e => {
         console.error('Re-org sync error', e)
