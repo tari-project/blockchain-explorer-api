@@ -10,9 +10,9 @@ const proto = grpc.loadPackageDefinition(protoLoader.loadSync('./protos/base_nod
   oneofs: true
 }))
 
-const { tari: { base_node: tariBaseNode } } = proto
+const { tari: { rpc: rpc } } = proto
 
-const client = new tariBaseNode.BaseNode(grpcUrl, grpc.credentials.createInsecure())
+const client = new rpc.BaseNode(grpcUrl, grpc.credentials.createInsecure())
 
 const protos = {
   baseNode: require('./base_node/index')(client)

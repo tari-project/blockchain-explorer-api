@@ -3,7 +3,7 @@ const fetch = require('node-fetch')
 const md5 = require('md5')
 const fs = require('fs')
 const path = require('path')
-const { protoRemoteUrl } = require('../../config')
+const { protoRemoteUrls } = require('../../config')
 
 const defaultHeightOrBlockGroupRequest = {
   from_tip: 30,
@@ -18,20 +18,28 @@ module.exports = (client) => {
       return reject(e)
     },
     _checkVersion: async function (saveNewVersion) {
-      const response = await fetch(protoRemoteUrl)
-      const remoteProto = await response.text()
-      const remoteMd5 = md5(remoteProto)
-      const localPath = path.join(__dirname, '/base_node.proto')
-      const localProto = fs.readFileSync(localPath)
-      const localMd5 = md5(localProto)
-      if (localMd5 !== remoteMd5) {
-        console.log('There is a new version of the proto file')
-        if (saveNewVersion) {
-          console.log('Overwriting proto file with latest')
-          fs.writeFileSync(localPath, remoteProto)
+      let versions = {}
+
+      for (const i in protoRemoteUrls) {
+        const url = protoRemoteUrls[i]
+        const response = await fetch(url)
+        const remoteProto = await response.text()
+        const remoteMd5 = md5(remoteProto)
+        const filename = url.split("/").pop()
+        const localPath = path.join(__dirname, `/${filename}`)
+        const localProto = fs.readFileSync(localPath)
+        const localMd5 = md5(localProto)
+        if (localMd5 !== remoteMd5) {
+          console.log(`There is a new version of the proto file "${filename}"`)
+          if (saveNewVersion) {
+            console.log(`Overwriting proto file "${filename} with latest`)
+            fs.writeFileSync(localPath, remoteProto)
+          }
         }
+        versions[filename] = { remoteMd5, localMd5 }
       }
-      return { remoteMd5, localMd5 }
+
+      return versions
     },
     GetChainTip: async function () {
       const chainTip = await this.ListHeaders({ num_headers: 1 })
@@ -63,6 +71,9 @@ module.exports = (client) => {
           resolve(response)
         })
       })
+    },
+    SearchKernels: async (signatures) => {
+      return responsify(client.SearchKernels({ signatures }), true, true)
     },
     GetConstants: async function () {
       return new Promise((resolve, reject) => {
