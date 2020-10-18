@@ -1,12 +1,12 @@
 version: "3.5"
 services:
   frontend:
-    image: quay.io/krakaw/block-explorer-frontend:latest
+    image: quay.io/tarilabs/block-explorer-frontend:latest
     env_file: .env.docker.frontend
     volumes:
       - frontend:/app/dist
   api:
-    image: quay.io/krakaw/blockchain-explorer-api:latest
+    image: quay.io/tarilabs/blockchain-explorer-api:latest
     env_file: .env
     ports:
       - "$API_PORT:4000"
@@ -23,9 +23,7 @@ services:
       timeout: 5s
       retries: 3
   tari:
-    build:
-      context: .
-      dockerfile: basenode.Dockerfile
+    image: quay.io/tarilabs/tari_base_node:latest
     volumes:
       - "$PWD/_data/tari:/root/.tari"
     stdin_open: true
