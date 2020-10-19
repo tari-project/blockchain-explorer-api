@@ -12,9 +12,14 @@ const proto = grpc.loadPackageDefinition(protoLoader.loadSync('./protos/base_nod
 
 const { tari: { rpc } } = proto
 
-const client = new rpc.BaseNode(grpcUrl, grpc.credentials.createInsecure())
+const opts = {
+  'grpc.max_receive_message_length': 10 * 1024 * 1024
+}
+
+const client = new rpc.BaseNode(grpcUrl, grpc.credentials.createInsecure(), opts)
 
 const protos = {
   baseNode: require('./base_node/index')(client)
 }
+
 module.exports = protos
