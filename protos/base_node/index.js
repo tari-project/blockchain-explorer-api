@@ -18,14 +18,14 @@ module.exports = (client) => {
       return reject(e)
     },
     _checkVersion: async function (saveNewVersion) {
-      let versions = {}
+      const versions = {}
 
       for (const i in protoRemoteUrls) {
         const url = protoRemoteUrls[i]
         const response = await fetch(url)
         const remoteProto = await response.text()
         const remoteMd5 = md5(remoteProto)
-        const filename = url.split("/").pop()
+        const filename = url.split('/').pop()
         const localPath = path.join(__dirname, `/${filename}`)
         const localProto = fs.readFileSync(localPath)
         const localMd5 = md5(localProto)
@@ -73,7 +73,10 @@ module.exports = (client) => {
       })
     },
     SearchKernels: async (signatures) => {
-      return responsify(client.SearchKernels({ signatures }), true, true)
+      const sigs = signatures.map(s => {
+        return { public_nonce: s.publicNonce, signature: s.signature }
+      })
+      return responsify(client.SearchKernels({ signatures: sigs }), true, true)
     },
     GetConstants: async function () {
       return new Promise((resolve, reject) => {
