@@ -22,6 +22,22 @@ router.get('/chain-metadata', async (req, res) => {
   }
 })
 
+router.get('/kernel/:public_nonce/:signature', async (req, res) => {
+  try {
+    let { public_nonce, signature } = req.params
+
+    // these must be base64 for GRPC
+    public_nonce = Buffer.from(public_nonce, "hex").toString("base64");
+    signature = Buffer.from(signature, "hex").toString("base64");
+
+    const blocks = await baseNode.SearchKernels([{ public_nonce, signature }])
+    return res.json({ blocks })
+  } catch (e) {
+    console.error("error", e)
+    return res.sendStatus(500).json(e)
+  }
+})
+
 router.get('/blocks/:blockId', async (req, res) => {
   try {
     const { blockId } = req.params
