@@ -11,6 +11,7 @@ cp .env.sample .env
 cp .env.docker.frontend.sample .env.docker.frontend
 docker-compose up -d redis
 docker-compose up -d tari
+npm install
 npm run dev
 # Use `NO_CRON=1 npm run dev` to stop the cronjobs from running.
 ```
