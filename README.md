@@ -16,6 +16,24 @@ npm run dev
 # Use `NO_CRON=1 npm run dev` to stop the cronjobs from running.
 ```
 
+Notes:
+If you already have an existing setup and need to clear out the data (for instance due to a network change) you need
+to do the following:
+```bash
+docker stop blockchain-explorer-api_tari_1
+cd _data
+rm -rf tari
+docker exec -it blockchain-explorer-api_redis_1 redis-cli FLUSHALL
+docker stop blockchain-explorer-api_redis_1
+rm -rf redis
+```
+
+If you are testing new code for the base node against the blockchain explorer locally, you can build the
+tari image dependency with the following (from the root of the tari repository):
+```bash
+cd buildtools
+docker build  -t quay.io/tarilabs/tari_base_node:latest -f base_node.Dockerfile ..
+```
 
 ## Deployment
 
