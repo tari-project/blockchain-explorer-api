@@ -13,12 +13,29 @@ const {
 } = require('../models/base_node')
 const { baseNode } = require('../protos')
 
+function errorObject (name, message) {
+  return { error: { name, message } }
+}
+
+function sendInternalError (res, e) {
+  console.error(e)
+  return res.status(500).json(errorObject('internal', 'Internal error'))
+}
+
+function sendNotFoundError (res, message = 'Not found') {
+  return res.status(404).json(errorObject('not-found', message))
+}
+
+function sendBadRequest (res, message = 'Bad request') {
+  return res.status(40).json(errorObject('bad-request', message))
+}
+
 router.get('/chain-metadata', async (req, res) => {
   try {
     const metadata = await getChainMetadata(req.query.start)
     return res.json(metadata)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -33,8 +50,7 @@ router.get('/kernel/:publicNonce/:signature', async (req, res) => {
     const blocks = await baseNode.SearchKernels([{ publicNonce, signature }])
     return res.json({ blocks })
   } catch (e) {
-    console.error('error', e)
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -43,12 +59,11 @@ router.get('/blocks/:blockId', async (req, res) => {
     const { blockId } = req.params
     const block = (Number.isInteger(+blockId) ? await getBlocksByHeight(+blockId, +blockId) : await getBlocksByHashes([blockId])).pop()
     if (!block) {
-      return res.sendStatus(404)
+      return sendNotFoundError(res, 'Block not found')
     }
     return res.json(block)
   } catch (e) {
-    console.error(e)
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -62,8 +77,7 @@ router.get('/blocks', async (req, res, next) => {
 
     return res.json({ blocks, paging })
   } catch (e) {
-    console.error(e)
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -80,25 +94,25 @@ router.get('/headers', async (req, res, next) => {
 
     return res.json({ headers, paging })
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
 router.get('/transactions', async (req, res) => {
   if (!req.query.from) {
-    return res.sendStatus(400)
+    return sendBadRequest(res, 'query.from is required')
   }
 
   const from = +req.query.from
   if (isNaN(from)) {
-    return res.sendStatus(400)
+    return sendBadRequest(res, 'query.from must be numeric')
   }
 
   try {
     const transactions = await getTransactions(from)
     return res.json({ transactions })
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -107,7 +121,7 @@ router.get('/calc-timing', async (req, res) => {
     const data = await baseNode.GetCalcTiming(req.query)
     return res.json(data)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -116,7 +130,7 @@ router.get('/constants', async (_, res) => {
     const data = await getConstants()
     return res.json(data)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -125,7 +139,7 @@ router.get('/block-size', async (req, res) => {
     const data = await baseNode.GetBlockSize(req.query)
     return res.json(data)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -134,7 +148,7 @@ router.get('/block-fees', async (req, res) => {
     const data = await baseNode.GetBlockFees(req.query)
     return res.json(data)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -143,7 +157,7 @@ router.get('/version', async (_, res) => {
     const data = await baseNode.GetVersion()
     return res.json(data)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -171,8 +185,7 @@ router.get('/tokens-in-circulation', async (req, res) => {
 
     return res.json(data)
   } catch (e) {
-    console.error(e)
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
@@ -181,7 +194,7 @@ router.get('/network-difficulty', async (req, res) => {
     const data = await baseNode.GetNetworkDifficulty(req.query)
     return res.json(data)
   } catch (e) {
-    return res.sendStatus(500).json(e)
+    return sendInternalError(res, e)
   }
 })
 
