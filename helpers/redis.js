@@ -15,6 +15,7 @@ const client = {
   hset: promisify(syncClient.hset).bind(syncClient),
   hget: promisify(syncClient.hget).bind(syncClient),
   hmget: promisify(syncClient.hmget).bind(syncClient),
+  ping: promisify(syncClient.ping).bind(syncClient),
   zadd: promisify(syncClient.zadd).bind(syncClient),
   zrangebyscore: promisify(syncClient.zrangebyscore).bind(syncClient),
   zremrangebyscore: promisify(syncClient.zremrangebyscore).bind(syncClient),
