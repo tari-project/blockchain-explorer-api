@@ -116,9 +116,9 @@ router.get('/transactions', async (req, res) => {
   }
 })
 
-router.get('/calc-timing', async (req, res) => {
+router.get('/block-timing', async (req, res) => {
   try {
-    const data = await baseNode.GetCalcTiming(req.query)
+    const data = await baseNode.GetBlockTiming(req.query)
     return res.json(data)
   } catch (e) {
     return sendInternalError(res, e)
