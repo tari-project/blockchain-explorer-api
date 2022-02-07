@@ -58,13 +58,13 @@ module.exports = (client) => {
       }
       return responsify(client.ListHeaders(options), true, true)
     },
-    GetCalcTiming: async function (heightRequest) {
+    GetBlockTiming: async function (heightRequest) {
       const options = {
         ...defaultHeightOrBlockGroupRequest,
         ...heightRequest
       }
       return new Promise((resolve, reject) => {
-        client.GetCalcTiming(options, (error, response) => {
+        client.GetBlockTiming(options, (error, response) => {
           if (error) {
             return this._onError(error, reject)
           }

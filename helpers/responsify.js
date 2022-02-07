@@ -1,6 +1,6 @@
 const convertBuffToHex = (data) => {
   if (typeof data === 'object') {
-    if (data.constructor.name === 'Buffer') {
+    if (Buffer.isBuffer(data)) {
       return data.toString('hex')
     } else {
       for (const i in data) {
