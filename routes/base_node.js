@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const { client: redis } = require('../helpers/redis')
 
 const { rangeInclusive } = require('../helpers/array')
 const { redisPageRange } = require('../helpers/paging')
@@ -196,6 +197,22 @@ router.get('/network-difficulty', async (req, res) => {
   } catch (e) {
     return sendInternalError(res, e)
   }
+})
+
+router.get("/healthz", async (_, res) => {
+  try {
+    await baseNode.GetVersion()
+  } catch (e) {
+    return sendInternalError(res, `Base node error : ${e}`)
+  }
+  try {
+    if (await redis.ping() != "PONG") {
+      return sendInternalError(res, "Redis not running properly!");
+    }
+  } catch (e) {
+    return sendInternalError(res, `Redis error : ${e}`);
+  }
+  return res.status(200).send({ status: "OK" })
 })
 
 module.exports = router
