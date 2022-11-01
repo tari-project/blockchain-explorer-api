@@ -22,21 +22,20 @@
 syntax = "proto3";
 
 import "types.proto";
+import "transaction.proto";
+import "block.proto";
+import "network.proto";
 
 package tari.rpc;
 
 // The gRPC interface for interacting with the base node.
 service BaseNode {
     // Lists headers in the current best chain
-    rpc ListHeaders(ListHeadersRequest) returns (stream BlockHeader);
+    rpc ListHeaders(ListHeadersRequest) returns (stream BlockHeaderResponse);
     // Get header by hash
     rpc GetHeaderByHash(GetHeaderByHashRequest) returns (BlockHeaderResponse);
     // Returns blocks in the current best chain. Currently only supports querying by height
     rpc GetBlocks(GetBlocksRequest) returns (stream HistoricalBlock);
-    // Returns the calc timing for the chain heights
-    rpc GetCalcTiming(HeightRequest) returns (CalcTimingResponse) {
-        option deprecated = true;
-    };
     // Returns the block timing for the chain heights
     rpc GetBlockTiming(HeightRequest) returns (BlockTimingResponse);
     // Returns the network Constants
@@ -57,8 +56,12 @@ service BaseNode {
     rpc GetNewBlockTemplate(NewBlockTemplateRequest) returns (NewBlockTemplateResponse);
     // Construct a new block from a provided template
     rpc GetNewBlock(NewBlockTemplate) returns (GetNewBlockResult);
+    // Construct a new block and header blob from a provided template
+    rpc GetNewBlockBlob(NewBlockTemplate) returns (GetNewBlockBlobResult);
     // Submit a new block for propagation
     rpc SubmitBlock(Block) returns (SubmitBlockResponse);
+    // Submit a new mined block blob for propagation
+    rpc SubmitBlockBlob(BlockBlobRequest) returns (SubmitBlockResponse);
     // Submit a transaction for propagation
     rpc SubmitTransaction(SubmitTransactionRequest) returns (SubmitTransactionResponse);
     // Get the base node sync information
@@ -86,9 +89,6 @@ service BaseNode {
     // Get mempool stats
     rpc GetMempoolStats(Empty) returns (MempoolStatsResponse);
 
-    rpc GetTokens(GetTokensRequest) returns (stream GetTokensResponse);
-    rpc ListAssetRegistrations(ListAssetRegistrationsRequest) returns (stream ListAssetRegistrationsResponse);
-    rpc GetAssetMetadata(GetAssetMetadataRequest) returns (GetAssetMetadataResponse);
 }
 
 message GetAssetMetadataRequest {
@@ -140,6 +140,11 @@ message SubmitBlockResponse {
     bytes block_hash = 1;
 }
 
+message BlockBlobRequest{
+    bytes header_blob = 1;
+    bytes body_blob = 2;
+}
+
 /// return type of GetTipInfo
 message TipInfoResponse {
     MetaData metadata = 1;
@@ -177,6 +182,8 @@ message NetworkDifficultyResponse {
     uint64 height = 3;
     uint64 timestamp = 4;
     uint64 pow_algo = 5;
+    uint64 sha3_estimated_hash_rate = 6;
+    uint64 monero_estimated_hash_rate = 7;
 }
 
 // A generic single value response for a specific height
@@ -234,14 +241,6 @@ message HeightRequest {
     uint64 end_height = 3;
 }
 
-// The return type of the rpc GetCalcTiming
-message CalcTimingResponse {
-    option deprecated = true;
-    uint64 max = 1;
-    uint64 min = 2;
-    double avg = 3;
-}
-
 // The return type of the rpc GetBlockTiming
 message BlockTimingResponse {
     uint64 max = 1;
@@ -254,6 +253,7 @@ message GetHeaderByHashRequest {
     // The hash of the block header
     bytes hash = 1;
 }
+
 
 message BlockHeaderResponse {
     // The block header
@@ -342,6 +342,18 @@ message GetNewBlockResult{
     bytes merge_mining_hash =3;
 }
 
+// This is the message that is returned for a miner after it asks for a new block.
+message GetNewBlockBlobResult{
+    // This is the header hash of the completed block
+    bytes block_hash = 1;
+    // This is the completed block's header
+    bytes header = 2;
+    // This is the completed block's body
+    bytes block_body = 3;
+    bytes merge_mining_hash =4;
+    bytes utxo_mr = 5;
+}
+
 // This is mining data for the miner asking for a new block
 message MinerData{
     PowAlgo algo = 1;
@@ -417,8 +429,8 @@ enum TransactionLocation {
 }
 
 message MempoolStatsResponse {
-    uint64 total_txs = 1;
     uint64 unconfirmed_txs = 2;
     uint64 reorg_txs = 3;
-    uint64 total_weight = 4;
+    uint64 unconfirmed_weight = 4;
 }
+
