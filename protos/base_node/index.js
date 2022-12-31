@@ -1,9 +1,10 @@
 const responsify = require("../../helpers/responsify");
-const fetch = require("node-fetch");
 const md5 = require("md5");
 const fs = require("fs");
 const path = require("path");
 const { protoRemoteUrls } = require("../../config");
+
+const GRPC_DEADLINE = parseInt(process.env.GRPC_DEADLINE || "60000")
 
 const defaultHeightOrBlockGroupRequest = {
   from_tip: 30,
@@ -78,10 +79,11 @@ module.exports = (client) => {
       });
       return responsify(client.SearchKernels({ signatures: sigs }), true, true);
     },
-    GetConstants: async function () {
+    GetConstants: async function (blockHeight) {
       return new Promise((resolve, reject) => {
-        client.GetConstants(undefined, (error, response) => {
+        client.GetConstants(blockHeight, { deadline: Date.now() + GRPC_DEADLINE }, (error, response) => {
           if (error) {
+            console.log('ERROR GetConstants', error)
             return this._onError(error, reject);
           }
           resolve(response);

@@ -1,11 +1,11 @@
-FROM node:18 AS builder
+FROM node:19 AS builder
 RUN apt-get update && apt-get install -y python3 make gcc g++
 WORKDIR /app
 COPY ./package*.json ./
 RUN npm install --production
 
 
-FROM node:18-slim AS base
+FROM node:19-slim AS base
 RUN apt-get update && apt-get install -y curl tini
 # Create the client builder
 WORKDIR /app

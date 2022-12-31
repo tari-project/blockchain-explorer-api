@@ -1,27 +1,11 @@
 // Redis
-const redis = require('redis')
+const Redis = require('ioredis')
 const { redisUrl } = require('../config')
-const syncClient = redis.createClient(redisUrl)
-syncClient.on('error', (e) => {
+const client = new Redis(redisUrl)
+client.on('error', (e) => {
   console.error(e)
 })
-const { promisify } = require('util')
-const client = {
-  _client: syncClient,
-  get: promisify(syncClient.get).bind(syncClient),
-  incrby: promisify(syncClient.incrby).bind(syncClient),
-  mget: promisify(syncClient.mget).bind(syncClient),
-  set: promisify(syncClient.set).bind(syncClient),
-  hset: promisify(syncClient.hset).bind(syncClient),
-  hget: promisify(syncClient.hget).bind(syncClient),
-  hmget: promisify(syncClient.hmget).bind(syncClient),
-  ping: promisify(syncClient.ping).bind(syncClient),
-  zadd: promisify(syncClient.zadd).bind(syncClient),
-  zrangebyscore: promisify(syncClient.zrangebyscore).bind(syncClient),
-  zremrangebyscore: promisify(syncClient.zremrangebyscore).bind(syncClient),
-  zrange: promisify(syncClient.zrange).bind(syncClient),
-  flushall: promisify(syncClient.flushall).bind(syncClient)
-}
+
 const REDIS_STORE_KEYS = {
   BLOCK_CURRENT_HEIGHT: 'current_block_height',
   DIFFICULTY_CURRENT_HEIGHT: 'current_difficulty_height',

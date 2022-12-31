@@ -317,7 +317,7 @@ const syncConstants = async () => {
   let constants = {};
   try {
     console.debug("Syncing constants");
-    constants = await protos.baseNode.GetConstants();
+    constants = await protos.baseNode.GetConstants(await getBlockHeight());
     await redis.set(REDIS_STORE_KEYS.CONSTANTS, JSON.stringify(constants));
   } catch (e) {
     console.error("Error syncConstants", e);
